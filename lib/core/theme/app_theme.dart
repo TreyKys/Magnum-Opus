@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color background = Color(0xFF121212);
-  static const Color accent = Colors.cyanAccent;
-  static const Color surface = Color(0xFF1E1E1E);
+  static const Color background = Color(0xFF0A0A0A);
+  static const Color accentCyan = Colors.cyanAccent;
+  static const Color accentPurple = Colors.purpleAccent;
+  static const Color surface = Color(0xFF1A1A1A);
 
   static ThemeData get darkTheme {
     return ThemeData(
@@ -13,7 +14,7 @@ class AppTheme {
       primaryColor: background,
       colorScheme: const ColorScheme.dark(
         primary: background,
-        secondary: accent,
+        secondary: accentCyan,
         surface: surface,
       ),
       appBarTheme: const AppBarTheme(
@@ -28,7 +29,7 @@ class AppTheme {
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: accent,
+        backgroundColor: accentCyan,
         foregroundColor: Colors.black,
       ),
       cardTheme: CardThemeData(
@@ -37,6 +38,11 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: accentCyan,
+        unselectedLabelColor: Colors.white54,
+        indicatorColor: accentCyan,
       ),
       textTheme: GoogleFonts.bricolageGrotesqueTextTheme(
         ThemeData.dark().textTheme,

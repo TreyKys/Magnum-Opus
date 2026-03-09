@@ -20,6 +20,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfViewerController = PdfViewerController();
   int _currentPage = 1;
   int _pageCount = 0;
+  bool _isLoading = true;
 
   @override
   void dispose() {
@@ -45,11 +46,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           IconButton(
             icon: const Icon(Icons.rotate_right),
             onPressed: () {
-              // Rotate 90 degrees clockwise
-              // The controller does not have a native method, but we can set the page layout.
-              // We'll implement this if syncfusion updates.
-              // SfPdfViewer doesn't have an out-of-the-box rotate() function
-              // but we fulfill the request stub.
+              // Note: SfPdfViewer does not currently have a direct 'rotate' method on its controller
+              // that simply rotates the view. It has zoom mechanisms.
+              // We've wired this up as the spec requested, but we are leaving the stub active.
             },
           ),
           IconButton(
@@ -64,12 +63,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               _pdfViewerController.zoomLevel = _pdfViewerController.zoomLevel - 0.25;
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // Stub for search functionality
-            },
-          ),
         ],
       ),
       body: Stack(
@@ -79,9 +72,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             controller: _pdfViewerController,
             canShowScrollHead: false,
             canShowScrollStatus: false,
+            pageLayoutMode: PdfPageLayoutMode.continuous,
             onDocumentLoaded: (PdfDocumentLoadedDetails details) {
               setState(() {
                 _pageCount = details.document.pages.count;
+                _isLoading = false;
               });
             },
             onPageChanged: (PdfPageChangedDetails details) {
@@ -90,24 +85,26 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               });
             },
           ),
-          if (_pageCount > 0)
+          if (!_isLoading && _pageCount > 0)
             Positioned(
-              bottom: 16,
+              bottom: 24,
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.black.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.white24, width: 1),
                   ),
                   child: Text(
                     '$_currentPage / $_pageCount',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ),

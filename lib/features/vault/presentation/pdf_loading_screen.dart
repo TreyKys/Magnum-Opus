@@ -24,10 +24,10 @@ class _PdfLoadingScreenState extends State<PdfLoadingScreen> with SingleTickerPr
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
-    _animation = Tween<double>(begin: -10, end: 10).animate(
+    _animation = Tween<double>(begin: -15, end: 15).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
 
@@ -35,10 +35,8 @@ class _PdfLoadingScreenState extends State<PdfLoadingScreen> with SingleTickerPr
   }
 
   Future<void> _transitionToViewer() async {
-    // Artificial delay to show the animation, normally you would wait for the file to load
-    // But SfPdfViewer loads it synchronously anyway, so we just give a small buffer
-    // to prevent UI freezing right away.
-    await Future.delayed(const Duration(milliseconds: 1200));
+    // 1.5-second delay before seamlessly replacing the screen
+    await Future.delayed(const Duration(milliseconds: 1500));
 
     if (!mounted) return;
 
@@ -68,7 +66,7 @@ class _PdfLoadingScreenState extends State<PdfLoadingScreen> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF0A0A0A),
       body: Center(
         child: AnimatedBuilder(
           animation: _animation,
@@ -82,16 +80,17 @@ class _PdfLoadingScreenState extends State<PdfLoadingScreen> with SingleTickerPr
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(
-                Icons.document_scanner_outlined,
-                size: 80,
+                Icons.description,
+                size: 90,
                 color: Colors.cyanAccent,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Text(
                 'Opening your document...',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: Colors.white70,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
                     ),
               ),
             ],
