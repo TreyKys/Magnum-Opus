@@ -48,6 +48,16 @@ CREATE TABLE documents (
     await db.insert('documents', document.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  Future<void> updateDocument(DocumentModel document) async {
+    final db = await instance.database;
+    await db.update(
+      'documents',
+      document.toMap(),
+      where: 'id = ?',
+      whereArgs: [document.id],
+    );
+  }
+
   Future<List<DocumentModel>> getAllDocuments() async {
     final db = await instance.database;
     final result = await db.query('documents', orderBy: 'last_accessed DESC');

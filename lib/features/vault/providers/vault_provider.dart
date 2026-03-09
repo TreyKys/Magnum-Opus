@@ -79,6 +79,17 @@ class VaultNotifier extends Notifier<List<DocumentModel>> {
     }
   }
 
+  Future<void> openDocument(String id) async {
+    try {
+      final doc = state.firstWhere((element) => element.id == id);
+      final updatedDoc = doc.copyWith(lastAccessed: DateTime.now());
+      await DatabaseHelper.instance.updateDocument(updatedDoc);
+      await _loadDocuments(); // Refresh state
+    } catch (e) {
+      // Error updating document
+    }
+  }
+
   Future<void> deleteDocument(String id, String filePath) async {
     try {
       // Delete from SQLite

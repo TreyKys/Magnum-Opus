@@ -20,6 +20,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfViewerController = PdfViewerController();
   int _currentPage = 1;
   int _pageCount = 0;
+  int _quarterTurns = 0;
 
   @override
   void dispose() {
@@ -45,11 +46,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           IconButton(
             icon: const Icon(Icons.rotate_right),
             onPressed: () {
-              // Rotate 90 degrees clockwise
-              // The controller does not have a native method, but we can set the page layout.
-              // We'll implement this if syncfusion updates.
-              // SfPdfViewer doesn't have an out-of-the-box rotate() function
-              // but we fulfill the request stub.
+              setState(() {
+                _quarterTurns++;
+              });
             },
           ),
           IconButton(
@@ -61,7 +60,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           IconButton(
             icon: const Icon(Icons.zoom_out),
             onPressed: () {
-              _pdfViewerController.zoomLevel = _pdfViewerController.zoomLevel - 0.25;
+              if (_pdfViewerController.zoomLevel > 1.0) {
+                _pdfViewerController.zoomLevel = _pdfViewerController.zoomLevel - 0.25;
+              }
             },
           ),
           IconButton(
@@ -74,21 +75,24 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       ),
       body: Stack(
         children: [
-          SfPdfViewer.file(
-            File(widget.filePath),
-            controller: _pdfViewerController,
-            canShowScrollHead: false,
-            canShowScrollStatus: false,
-            onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-              setState(() {
-                _pageCount = details.document.pages.count;
-              });
-            },
-            onPageChanged: (PdfPageChangedDetails details) {
-              setState(() {
-                _currentPage = details.newPageNumber;
-              });
-            },
+          RotatedBox(
+            quarterTurns: _quarterTurns,
+            child: SfPdfViewer.file(
+              File(widget.filePath),
+              controller: _pdfViewerController,
+              canShowScrollHead: false,
+              canShowScrollStatus: false,
+              onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                setState(() {
+                  _pageCount = details.document.pages.count;
+                });
+              },
+              onPageChanged: (PdfPageChangedDetails details) {
+                setState(() {
+                  _currentPage = details.newPageNumber;
+                });
+              },
+            ),
           ),
           if (_pageCount > 0)
             Positioned(
