@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:myapp/features/vault/providers/vault_provider.dart';
 import 'package:myapp/features/vault/presentation/pdf_loading_screen.dart';
@@ -8,7 +9,8 @@ class VaultScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final documents = ref.watch(vaultProvider);
+    final vaultState = ref.watch(vaultProvider);
+    final documents = vaultState.documents;
 
     // Sort documents for recents (already sorted by last_accessed DESC in db, but let's be sure)
     final recentDocuments = List.of(documents)..sort((a, b) => b.lastAccessed.compareTo(a.lastAccessed));
@@ -18,8 +20,27 @@ class VaultScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('MAGNUM VAULT'),
-          bottom: const TabBar(
-            tabs: [
+          bottom: TabBar(
+            onTap: (index) {
+              HapticFeedback.lightImpact();
+            },
+            indicator: BoxDecoration(
+              border: const Border(
+                bottom: BorderSide(
+                  color: Color(0xFF00E5FF),
+                  width: 2.0,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                  blurRadius: 10.0,
+                  spreadRadius: 2.0,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            tabs: const [
               Tab(text: 'VAULT'),
               Tab(text: 'RECENTS'),
             ],
@@ -27,8 +48,8 @@ class VaultScreen extends ConsumerWidget {
         ),
         body: TabBarView(
           children: [
-            _buildDocumentList(context, ref, documents),
-            _buildDocumentList(context, ref, recentDocuments),
+            _buildDocumentList(context, ref, documents, vaultState.indexingDocumentIds),
+            _buildDocumentList(context, ref, recentDocuments, vaultState.indexingDocumentIds),
           ],
         ),
         floatingActionButton: FloatingActionButton(
@@ -41,7 +62,7 @@ class VaultScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDocumentList(BuildContext context, WidgetRef ref, List documents) {
+  Widget _buildDocumentList(BuildContext context, WidgetRef ref, List documents, Set<String> indexingIds) {
     if (documents.isEmpty) {
       return const Center(
         child: Text(
@@ -57,12 +78,31 @@ class VaultScreen extends ConsumerWidget {
       itemCount: documents.length,
       itemBuilder: (context, index) {
         final doc = documents[index];
+        final isIndexing = indexingIds.contains(doc.id);
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
           child: Card(
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              leading: const Icon(
+            elevation: 0.0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Colors.white10, width: 1),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1A1A1A),
+                    Color(0xFF121212),
+                  ],
+                ),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                leading: const Icon(
                 Icons.description_outlined,
                 color: Colors.cyanAccent,
                 size: 36,
@@ -91,6 +131,10 @@ class VaultScreen extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (isIndexing) ...[
+                      const SizedBox(width: 8),
+                      const _PulsingIndicator(),
+                    ],
                   ],
                 ),
               ),
@@ -101,10 +145,12 @@ class VaultScreen extends ConsumerWidget {
                 },
               ),
               onTap: () {
+                HapticFeedback.lightImpact();
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => PdfLoadingScreen(
+                      id: doc.id,
                       filePath: doc.filePath,
                       title: doc.title,
                     ),
@@ -112,9 +158,71 @@ class VaultScreen extends ConsumerWidget {
                 );
               },
             ),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+class _PulsingIndicator extends StatefulWidget {
+  const _PulsingIndicator();
+
+  @override
+  State<_PulsingIndicator> createState() => _PulsingIndicatorState();
+}
+
+class _PulsingIndicatorState extends State<_PulsingIndicator> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Opacity(
+              opacity: 0.3 + (_controller.value * 0.7),
+              child: child,
+            );
+          },
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFF00E5FF),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          'Indexing...',
+          style: TextStyle(
+            color: Color(0xFF00E5FF),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

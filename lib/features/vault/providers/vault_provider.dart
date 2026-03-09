@@ -7,21 +7,64 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path/path.dart' as p;
 import 'package:myapp/core/database/database_helper.dart';
 import 'package:myapp/features/vault/models/document_model.dart';
+import 'package:myapp/features/vault/services/document_extraction_service.dart';
 
-final vaultProvider = NotifierProvider<VaultNotifier, List<DocumentModel>>(() {
+class VaultState {
+  final List<DocumentModel> documents;
+  final Set<String> indexingDocumentIds;
+
+  VaultState({
+    this.documents = const [],
+    this.indexingDocumentIds = const {},
+  });
+
+  VaultState copyWith({
+    List<DocumentModel>? documents,
+    Set<String>? indexingDocumentIds,
+  }) {
+    return VaultState(
+      documents: documents ?? this.documents,
+      indexingDocumentIds: indexingDocumentIds ?? this.indexingDocumentIds,
+    );
+  }
+}
+
+final vaultProvider = NotifierProvider<VaultNotifier, VaultState>(() {
   return VaultNotifier();
 });
 
-class VaultNotifier extends Notifier<List<DocumentModel>> {
+class VaultNotifier extends Notifier<VaultState> {
   @override
-  List<DocumentModel> build() {
+  VaultState build() {
     _loadDocuments();
-    return [];
+    return VaultState();
   }
 
   Future<void> _loadDocuments() async {
     final docs = await DatabaseHelper.instance.getAllDocuments();
-    state = docs;
+    state = state.copyWith(documents: docs);
+    _validateExtractions(docs);
+  }
+
+  Future<void> _validateExtractions(List<DocumentModel> docs) async {
+    await DocumentExtractionService.validateAndResumeExtraction(
+      docs,
+      _startExtraction,
+    );
+  }
+
+  void _startExtraction(DocumentModel document) {
+    if (!state.indexingDocumentIds.contains(document.id)) {
+      final newSet = Set<String>.from(state.indexingDocumentIds)..add(document.id);
+      state = state.copyWith(indexingDocumentIds: newSet);
+    }
+
+    DocumentExtractionService.extractDocument(document, (completedId) {
+      if (state.indexingDocumentIds.contains(completedId)) {
+        final newSet = Set<String>.from(state.indexingDocumentIds)..remove(completedId);
+        state = state.copyWith(indexingDocumentIds: newSet);
+      }
+    });
   }
 
   Future<void> ingestPdf() async {
@@ -72,7 +115,12 @@ class VaultNotifier extends Notifier<List<DocumentModel>> {
         );
 
         await DatabaseHelper.instance.insertDocument(docModel);
-        await _loadDocuments(); // Refresh state
+
+        final updatedDocs = await DatabaseHelper.instance.getAllDocuments();
+        state = state.copyWith(documents: updatedDocs);
+
+        // Start extraction for the newly ingested document
+        _startExtraction(docModel);
       }
     } catch (e) {
       // Error during ingestion
@@ -91,7 +139,8 @@ class VaultNotifier extends Notifier<List<DocumentModel>> {
       }
 
       // Refresh state
-      await _loadDocuments();
+      final updatedDocs = await DatabaseHelper.instance.getAllDocuments();
+      state = state.copyWith(documents: updatedDocs);
     } catch (e) {
       // Error deleting document
     }

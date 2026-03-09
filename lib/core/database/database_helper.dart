@@ -20,9 +20,32 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+      onConfigure: (db) async {
+        // Enable foreign key constraints
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
     );
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      const idType = 'TEXT PRIMARY KEY';
+      const textType = 'TEXT NOT NULL';
+      const integerType = 'INTEGER NOT NULL';
+
+      await db.execute('''
+CREATE TABLE document_chunks (
+  id $idType,
+  document_id $textType,
+  page_number $integerType,
+  extracted_text $textType,
+  FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
+)
+''');
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -41,11 +64,58 @@ CREATE TABLE documents (
   last_accessed $textType
 )
 ''');
+
+    await db.execute('''
+CREATE TABLE document_chunks (
+  id $idType,
+  document_id $textType,
+  page_number $integerType,
+  extracted_text $textType,
+  FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
+)
+''');
   }
 
   Future<void> insertDocument(DocumentModel document) async {
     final db = await instance.database;
     await db.insert('documents', document.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> insertDocumentChunksBatch(List<Map<String, dynamic>> chunks) async {
+    final db = await instance.database;
+    final batch = db.batch();
+    for (final chunk in chunks) {
+      batch.insert('document_chunks', chunk, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<int> getExtractedPageCount(String documentId) async {
+    final db = await instance.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(DISTINCT page_number) as count FROM document_chunks WHERE document_id = ?',
+      [documentId],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<void> deleteDocumentChunks(String documentId) async {
+    final db = await instance.database;
+    await db.delete(
+      'document_chunks',
+      where: 'document_id = ?',
+      whereArgs: [documentId],
+    );
+  }
+
+  Future<void> updateDocumentLastAccessed(String documentId) async {
+    final db = await instance.database;
+    await db.update(
+      'documents',
+      {'last_accessed': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [documentId],
+    );
   }
 
   Future<List<DocumentModel>> getAllDocuments() async {
@@ -56,6 +126,11 @@ CREATE TABLE documents (
 
   Future<void> deleteDocument(String id) async {
     final db = await instance.database;
+    await db.delete(
+      'document_chunks',
+      where: 'document_id = ?',
+      whereArgs: [id],
+    );
     await db.delete(
       'documents',
       where: 'id = ?',
