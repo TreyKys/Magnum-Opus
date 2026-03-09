@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color background = Color(0xFF121212);
@@ -37,10 +38,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
         ),
       ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        bodyMedium: TextStyle(color: Colors.white70),
-        bodySmall: TextStyle(color: Colors.white54),
+      textTheme: GoogleFonts.bricolageGrotesqueTextTheme(
+        ThemeData.dark().textTheme,
+      ).copyWith(
+        titleLarge: GoogleFonts.bricolageGrotesque(color: Colors.white, fontWeight: FontWeight.bold),
+        bodyMedium: GoogleFonts.bricolageGrotesque(color: Colors.white70),
+        bodySmall: GoogleFonts.bricolageGrotesque(color: Colors.white54),
       ),
     );
   }

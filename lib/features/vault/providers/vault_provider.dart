@@ -43,7 +43,7 @@ class VaultNotifier extends Notifier<List<DocumentModel>> {
 
         // Copy to app's internal directory
         // Append UUID to avoid file name collision
-        final newPath = p.join(appDir.path, '\$id-\$fileName');
+        final newPath = p.join(appDir.path, '$id-$fileName');
         final savedFile = await originalFile.copy(newPath);
 
         // Extract metadata

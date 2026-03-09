@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:myapp/features/vault/providers/vault_provider.dart';
-import 'package:myapp/features/vault/presentation/pdf_viewer_screen.dart';
+import 'package:myapp/features/vault/presentation/pdf_loading_screen.dart';
 
 class VaultScreen extends ConsumerWidget {
   const VaultScreen({super.key});
@@ -32,30 +32,40 @@ class VaultScreen extends ConsumerWidget {
                   child: Card(
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      title: Text(
-                        doc.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16),
+                      leading: const Icon(
+                        Icons.description_outlined,
+                        color: Colors.cyanAccent,
+                        size: 32,
+                      ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              doc.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16),
+                            ),
+                          ),
+                        ],
                       ),
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 6.0),
                         child: Row(
                           children: [
-                            Text(
-                              '\${doc.fileSizeMb.toStringAsFixed(2)} MB',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '\${doc.totalPages} Pages',
-                              style: Theme.of(context).textTheme.bodySmall,
+                            Expanded(
+                              child: Text(
+                                '${doc.fileSizeMb.toStringAsFixed(2)} MB • ${doc.totalPages} Pages',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        icon: const Icon(Icons.delete_outline, color: Color(0xFFFF5252)),
                         onPressed: () {
                           ref.read(vaultProvider.notifier).deleteDocument(doc.id, doc.filePath);
                         },
@@ -64,7 +74,7 @@ class VaultScreen extends ConsumerWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => PdfViewerScreen(
+                            builder: (context) => PdfLoadingScreen(
                               filePath: doc.filePath,
                               title: doc.title,
                             ),
