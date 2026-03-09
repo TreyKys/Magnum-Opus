@@ -2,12 +2,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
+import 'package:myapp/core/database/database_helper.dart';
+
 class PdfViewerScreen extends StatefulWidget {
+  final String id;
   final String filePath;
   final String title;
 
   const PdfViewerScreen({
     super.key,
+    required this.id,
     required this.filePath,
     required this.title,
   });
@@ -78,6 +82,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 _pageCount = details.document.pages.count;
                 _isLoading = false;
               });
+
+              // According to Task 1 Requirement: Always update lastAccessed timestamp when a document is successfully opened.
+              DatabaseHelper.instance.updateDocumentLastAccessed(widget.id);
             },
             onPageChanged: (PdfPageChangedDetails details) {
               setState(() {
