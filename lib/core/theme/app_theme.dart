@@ -12,6 +12,7 @@ class AppTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: background,
       primaryColor: background,
+      fontFamily: GoogleFonts.bricolageGrotesque().fontFamily,
       colorScheme: const ColorScheme.dark(
         primary: background,
         secondary: accentCyan,
