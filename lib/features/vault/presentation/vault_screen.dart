@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:myapp/features/vault/providers/vault_provider.dart';
-import 'package:myapp/features/vault/presentation/pdf_loading_screen.dart';
+import 'package:myapp/features/vault/presentation/pdf_viewer_screen.dart';
 
 class VaultScreen extends ConsumerWidget {
   const VaultScreen({super.key});
@@ -24,22 +24,8 @@ class VaultScreen extends ConsumerWidget {
             onTap: (index) {
               HapticFeedback.lightImpact();
             },
-            indicator: BoxDecoration(
-              border: const Border(
-                bottom: BorderSide(
-                  color: Color(0xFF00E5FF),
-                  width: 2.0,
-                ),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
-                  blurRadius: 10.0,
-                  spreadRadius: 2.0,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+            indicatorColor: const Color(0xFF00E5FF),
+            indicatorWeight: 3.0,
             tabs: const [
               Tab(text: 'VAULT'),
               Tab(text: 'RECENTS'),
@@ -149,7 +135,7 @@ class VaultScreen extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => PdfLoadingScreen(
+                    builder: (context) => PdfViewerScreen(
                       id: doc.id,
                       filePath: doc.filePath,
                       title: doc.title,
