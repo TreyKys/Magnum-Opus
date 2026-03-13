@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import 'package:myapp/core/database/database_helper.dart';
+import 'package:myapp/features/vault/providers/chat_provider.dart';
+import 'package:myapp/features/settings/providers/settings_provider.dart';
 
-class PdfViewerScreen extends StatefulWidget {
+class PdfViewerScreen extends ConsumerStatefulWidget {
   final String id;
   final String filePath;
   final String title;
@@ -18,16 +21,19 @@ class PdfViewerScreen extends StatefulWidget {
   });
 
   @override
-  State<PdfViewerScreen> createState() => _PdfViewerScreenState();
+  ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
-class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderStateMixin {
+class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerProviderStateMixin {
   final PdfViewerController _pdfViewerController = PdfViewerController();
+  final TextEditingController _chatController = TextEditingController();
+  final ScrollController _chatScrollController = ScrollController();
   int _currentPage = 1;
   int _pageCount = 0;
   bool _isLoading = true;
   bool _showLoadingScreen = true;
   int _quarterTurns = 0;
+  bool _isFullScreen = false;
 
   late AnimationController _hoverController;
   late Animation<double> _hoverAnimation;
@@ -65,6 +71,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
   @override
   void initState() {
     super.initState();
+
+    // Defer reading settings until after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final settings = ref.read(settingsProvider);
+      _pdfViewerController.zoomLevel = settings.defaultZoomLevel;
+    });
+
     _hoverController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -88,6 +101,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
   }
 
   void _showIntelSheet() {
+    if (_isFullScreen) {
+      setState(() {
+        _isFullScreen = false;
+      });
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -96,63 +115,150 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return FractionallySizedBox(
-          heightFactor: 0.8,
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+        return Consumer(
+          builder: (context, ref, child) {
+            final chatMessages = ref.watch(chatProvider(widget.id));
+            final chatNotifier = ref.read(chatProvider(widget.id).notifier);
+
+            // Auto-scroll to bottom when messages update
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_chatScrollController.hasClients) {
+                _chatScrollController.animateTo(
+                  _chatScrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              }
+            });
+
+            return FractionallySizedBox(
+              heightFactor: 0.8,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
                 ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: const [
-                      // Blank scrollable area for chat bubbles
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1A1A1A),
-                    border: Border(top: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
-                  ),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: "Ask the document...",
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: const Color(0xFF0A0A0A),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(color: Color(0xFF00E5FF)),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _chatScrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: chatMessages.length + (chatNotifier.isThinking ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == chatMessages.length && chatNotifier.isThinking) {
+                            return Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1E1E1E),
+                                  borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: Radius.zero),
+                                ),
+                                child: const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.cyanAccent,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          final msg = chatMessages[index];
+                          return Align(
+                            alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: msg.isUser ? Colors.cyanAccent : const Color(0xFF1E1E1E),
+                                borderRadius: BorderRadius.circular(16).copyWith(
+                                  bottomRight: msg.isUser ? Radius.zero : const Radius.circular(16),
+                                  bottomLeft: !msg.isUser ? Radius.zero : const Radius.circular(16),
+                                ),
+                              ),
+                              child: Text(
+                                msg.text,
+                                style: TextStyle(
+                                  color: msg.isUser ? Colors.black : Colors.white,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF1A1A1A),
+                        border: Border(top: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _chatController,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (value) {
+                                if (value.trim().isNotEmpty) {
+                                  chatNotifier.sendMessage(value);
+                                  _chatController.clear();
+                                }
+                              },
+                              decoration: InputDecoration(
+                                hintText: "Ask the document...",
+                                hintStyle: const TextStyle(color: Colors.white54),
+                                filled: true,
+                                fillColor: const Color(0xFF0A0A0A),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: const BorderSide(color: Color(0xFF00E5FF)),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.send, color: Colors.cyanAccent),
+                            onPressed: () {
+                              if (_chatController.text.trim().isNotEmpty) {
+                                chatNotifier.sendMessage(_chatController.text);
+                                _chatController.clear();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -161,6 +267,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
   @override
   void dispose() {
     _pdfViewerController.dispose();
+    _chatController.dispose();
+    _chatScrollController.dispose();
     _hoverController.dispose();
     _fadeController.dispose();
     super.dispose();
@@ -168,8 +276,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+
     return Scaffold(
-      appBar: AppBar(
+      appBar: _isFullScreen ? null : AppBar(
         title: Text(
           widget.title,
           maxLines: 1,
@@ -229,7 +339,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
               },
             ),
           ),
-          if (!_isLoading && _pageCount > 0)
+          if (!_isLoading && _pageCount > 0 && !_isFullScreen)
             Positioned(
               bottom: 32,
               left: 0,
@@ -246,6 +356,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen),
+                        onPressed: () {
+                          setState(() {
+                            _isFullScreen = true;
+                          });
+                        },
+                      ),
                       IconButton(
                         icon: const Icon(Icons.rotate_right, color: Colors.white70),
                         onPressed: () {
@@ -278,6 +396,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
                     ],
                   ),
                 ),
+              ),
+            ),
+          if (_isFullScreen)
+            Positioned(
+              bottom: 32,
+              right: 32,
+              child: FloatingActionButton(
+                backgroundColor: Colors.black.withOpacity(0.5),
+                elevation: 0,
+                onPressed: () {
+                  setState(() {
+                    _isFullScreen = false;
+                  });
+                },
+                child: const Icon(Icons.fullscreen_exit, color: Colors.white),
               ),
             ),
           if (_showLoadingScreen)
@@ -314,20 +447,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
                             ),
                       ),
                       const SizedBox(height: 48),
-                      FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                          child: Text(
-                            _selectedTip,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white54,
-                                  fontStyle: FontStyle.italic,
-                                ),
+                      if (settings.showReadingTips)
+                        FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                            child: Text(
+                              _selectedTip,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white54,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),

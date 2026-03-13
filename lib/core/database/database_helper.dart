@@ -138,6 +138,50 @@ CREATE TABLE document_chunks (
     );
   }
 
+  Future<String> getContextRichChunks(String documentId, String query) async {
+    final db = await instance.database;
+    final keywords = query.split(' ').where((w) => w.length > 3).toList();
+
+    if (keywords.isEmpty) return "No strong keywords found to search context.";
+
+    int? matchedPage;
+    // Basic search: Find the first chunk that matches any of the keywords
+    for (final keyword in keywords) {
+      final result = await db.query(
+        'document_chunks',
+        columns: ['page_number'],
+        where: 'document_id = ? AND extracted_text LIKE ?',
+        whereArgs: [documentId, '%$keyword%'],
+        limit: 1,
+      );
+      if (result.isNotEmpty) {
+        matchedPage = result.first['page_number'] as int;
+        break;
+      }
+    }
+
+    if (matchedPage == null) {
+      return "No exact text match found in the document for the given query.";
+    }
+
+    // Get the matched chunk, plus the one before and the one after
+    final chunks = await db.query(
+      'document_chunks',
+      where: 'document_id = ? AND page_number IN (?, ?, ?)',
+      whereArgs: [documentId, matchedPage - 1, matchedPage, matchedPage + 1],
+      orderBy: 'page_number ASC',
+    );
+
+    final buffer = StringBuffer();
+    for (final row in chunks) {
+      buffer.writeln('--- Page ${row['page_number']} ---');
+      buffer.writeln(row['extracted_text']);
+      buffer.writeln();
+    }
+
+    return buffer.toString();
+  }
+
   Future<void> close() async {
     final db = await instance.database;
     db.close();

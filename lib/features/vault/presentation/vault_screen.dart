@@ -19,7 +19,17 @@ class VaultScreen extends ConsumerWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('MAGNUM VAULT'),
+          title: const Text('Your Files 📁'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                // Navigate to SettingsScreen later
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+          ],
           bottom: TabBar(
             onTap: (index) {
               HapticFeedback.lightImpact();
