@@ -3,16 +3,21 @@ import 'package:myapp/core/ai/ai_service.dart';
 import 'package:myapp/core/database/database_helper.dart';
 import 'package:myapp/features/vault/models/chat_message.dart';
 
-final chatProvider = StateNotifierProvider.autoDispose.family<ChatNotifier, List<ChatMessage>, String>((ref, documentId) {
-  return ChatNotifier(documentId);
-});
+final chatProvider = NotifierProvider.autoDispose.family<ChatNotifier, List<ChatMessage>, String>(
+  (arg) => ChatNotifier(arg),
+);
 
-class ChatNotifier extends StateNotifier<List<ChatMessage>> {
-  final String documentId;
+class ChatNotifier extends Notifier<List<ChatMessage>> {
+  final String arg;
+  ChatNotifier(this.arg);
+
   final AiService _aiService = AiService();
   bool isThinking = false;
 
-  ChatNotifier(this.documentId) : super([]);
+  @override
+  List<ChatMessage> build() {
+    return [];
+  }
 
   Future<void> sendMessage(String query) async {
     if (query.trim().isEmpty) return;
@@ -23,7 +28,7 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
 
     try {
       // Step 1: Run getContextRichChunks from SQLite
-      final contextChunks = await DatabaseHelper.instance.getContextRichChunks(documentId, query);
+      final contextChunks = await DatabaseHelper.instance.getContextRichChunks(arg, query);
 
       // Step 2: Send payload to Gemini
       final response = await _aiService.generateRAGResponse(

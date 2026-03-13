@@ -26,12 +26,15 @@ class SettingsState {
   }
 }
 
-final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
+final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(() {
   return SettingsNotifier();
 });
 
-class SettingsNotifier extends StateNotifier<SettingsState> {
-  SettingsNotifier() : super(SettingsState());
+class SettingsNotifier extends Notifier<SettingsState> {
+  @override
+  SettingsState build() {
+    return SettingsState();
+  }
 
   void toggleHaptics(bool value) {
     if (value) HapticFeedback.lightImpact();
