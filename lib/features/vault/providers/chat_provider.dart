@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:myapp/core/ai/ai_service.dart';
-import 'package:myapp/core/database/database_helper.dart';
-import 'package:myapp/features/vault/models/chat_message.dart';
+import 'package:magnum_opus/core/ai/ai_service.dart';
+import 'package:magnum_opus/core/database/database_helper.dart';
+import 'package:magnum_opus/features/vault/models/chat_message.dart';
 
 final chatProvider = NotifierProvider.autoDispose.family<ChatNotifier, List<ChatMessage>, String>(
   (arg) => ChatNotifier(arg),

@@ -5,9 +5,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path/path.dart' as p;
-import 'package:myapp/core/database/database_helper.dart';
-import 'package:myapp/features/vault/models/document_model.dart';
-import 'package:myapp/features/vault/services/document_extraction_service.dart';
+import 'package:magnum_opus/core/database/database_helper.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/services/document_extraction_service.dart';
 
 class VaultState {
   final List<DocumentModel> documents;

@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
-import 'package:myapp/core/database/database_helper.dart';
-import 'package:myapp/features/vault/providers/chat_provider.dart';
-import 'package:myapp/features/settings/providers/settings_provider.dart';
+import 'package:magnum_opus/core/database/database_helper.dart';
+import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
+import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
 
 class PdfViewerScreen extends ConsumerStatefulWidget {
   final String id;

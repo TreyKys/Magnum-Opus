@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'dart:isolate';
-import 'package:myapp/core/database/database_helper.dart';
-import 'package:myapp/features/vault/models/document_model.dart';
+import 'package:magnum_opus/core/database/database_helper.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
 
 Future<List<Map<String, dynamic>>> extractPdfTextChunk(Map<String, dynamic> params) async {
   final String filePath = params['filePath'];
