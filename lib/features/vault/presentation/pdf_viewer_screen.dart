@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
@@ -24,9 +27,11 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
   ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
-class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerProviderStateMixin {
+class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
+    with TickerProviderStateMixin {
   final PdfViewerController _pdfViewerController = PdfViewerController();
   final TextEditingController _chatController = TextEditingController();
+  final GlobalKey _pdfViewerKey = GlobalKey();
   final ScrollController _chatScrollController = ScrollController();
   int _currentPage = 1;
   int _pageCount = 0;
@@ -65,7 +70,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
     "Magnum Opus dynamically chunks document data to prevent memory leaks.",
     "Your reading progress and recent documents are intelligently tracked.",
     "Background processes automatically retry if the app is unexpectedly closed.",
-    "Powered by Riverpod state management for flawless, reactive UI updates."
+    "Powered by Riverpod state management for flawless, reactive UI updates.",
   ];
 
   @override
@@ -91,13 +96,28 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
 
     _selectedTip = _tips[Random().nextInt(_tips.length)];
 
     _fadeController.forward();
+  }
+
+  Future<Uint8List?> _capturePdfScreen() async {
+    try {
+      final boundary =
+          _pdfViewerKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      return null;
+    }
   }
 
   void _showIntelSheet() {
@@ -152,10 +172,16 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                     Expanded(
                       child: ListView.builder(
                         controller: _chatScrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: chatMessages.length + (chatNotifier.isThinking ? 1 : 0),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        itemCount:
+                            chatMessages.length +
+                            (chatNotifier.isThinking ? 1 : 0),
                         itemBuilder: (context, index) {
-                          if (index == chatMessages.length && chatNotifier.isThinking) {
+                          if (index == chatMessages.length &&
+                              chatNotifier.isThinking) {
                             return Align(
                               alignment: Alignment.centerLeft,
                               child: Container(
@@ -163,7 +189,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF1E1E1E),
-                                  borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: Radius.zero),
+                                  borderRadius: BorderRadius.circular(
+                                    16,
+                                  ).copyWith(bottomLeft: Radius.zero),
                                 ),
                                 child: const SizedBox(
                                   width: 16,
@@ -179,21 +207,35 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
 
                           final msg = chatMessages[index];
                           return Align(
-                            alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                            alignment: msg.isUser
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
-                                color: msg.isUser ? Colors.cyanAccent : const Color(0xFF1E1E1E),
-                                borderRadius: BorderRadius.circular(16).copyWith(
-                                  bottomRight: msg.isUser ? Radius.zero : const Radius.circular(16),
-                                  bottomLeft: !msg.isUser ? Radius.zero : const Radius.circular(16),
-                                ),
+                                color: msg.isUser
+                                    ? Colors.cyanAccent
+                                    : const Color(0xFF1E1E1E),
+                                borderRadius: BorderRadius.circular(16)
+                                    .copyWith(
+                                      bottomRight: msg.isUser
+                                          ? Radius.zero
+                                          : const Radius.circular(16),
+                                      bottomLeft: !msg.isUser
+                                          ? Radius.zero
+                                          : const Radius.circular(16),
+                                    ),
                               ),
                               child: Text(
                                 msg.text,
                                 style: TextStyle(
-                                  color: msg.isUser ? Colors.black : Colors.white,
+                                  color: msg.isUser
+                                      ? Colors.black
+                                      : Colors.white,
                                   fontSize: 15,
                                 ),
                               ),
@@ -203,10 +245,15 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: const BoxDecoration(
                         color: Color(0xFF1A1A1A),
-                        border: Border(top: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
+                        border: Border(
+                          top: BorderSide(color: Color(0xFF2A2A2A), width: 1),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -214,39 +261,61 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                             child: TextField(
                               controller: _chatController,
                               textInputAction: TextInputAction.send,
-                              onSubmitted: (value) {
+                              onSubmitted: (value) async {
                                 if (value.trim().isNotEmpty) {
-                                  chatNotifier.sendMessage(value);
+                                  final imageBytes = await _capturePdfScreen();
+                                  chatNotifier.sendMessage(
+                                    value,
+                                    imageBytes: imageBytes,
+                                  );
                                   _chatController.clear();
                                 }
                               },
                               decoration: InputDecoration(
                                 hintText: "Ask the document...",
-                                hintStyle: const TextStyle(color: Colors.white54),
+                                hintStyle: const TextStyle(
+                                  color: Colors.white54,
+                                ),
                                 filled: true,
                                 fillColor: const Color(0xFF0A0A0A),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF2A2A2A),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF2A2A2A),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(color: Color(0xFF00E5FF)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF00E5FF),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(Icons.send, color: Colors.cyanAccent),
-                            onPressed: () {
+                            icon: const Icon(
+                              Icons.send,
+                              color: Colors.cyanAccent,
+                            ),
+                            onPressed: () async {
                               if (_chatController.text.trim().isNotEmpty) {
-                                chatNotifier.sendMessage(_chatController.text);
+                                final imageBytes = await _capturePdfScreen();
+                                chatNotifier.sendMessage(
+                                  _chatController.text,
+                                  imageBytes: imageBytes,
+                                );
                                 _chatController.clear();
                               }
                             },
@@ -279,64 +348,71 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
     final settings = ref.watch(settingsProvider);
 
     return Scaffold(
-      appBar: _isFullScreen ? null : AppBar(
-        title: Text(
-          widget.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.zoom_in),
-            onPressed: () {
-              _pdfViewerController.zoomLevel = _pdfViewerController.zoomLevel + 0.25;
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.zoom_out),
-            onPressed: () {
-              _pdfViewerController.zoomLevel = _pdfViewerController.zoomLevel - 0.25;
-            },
-          ),
-        ],
-      ),
+      appBar: _isFullScreen
+          ? null
+          : AppBar(
+              title: Text(
+                widget.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 16),
+              ),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.zoom_in),
+                  onPressed: () {
+                    _pdfViewerController.zoomLevel =
+                        _pdfViewerController.zoomLevel + 0.25;
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.zoom_out),
+                  onPressed: () {
+                    _pdfViewerController.zoomLevel =
+                        _pdfViewerController.zoomLevel - 0.25;
+                  },
+                ),
+              ],
+            ),
       body: Stack(
         children: [
           RotatedBox(
             quarterTurns: _quarterTurns,
-            child: SfPdfViewer.file(
-              File(widget.filePath),
-              controller: _pdfViewerController,
-              canShowScrollHead: false,
-              canShowScrollStatus: false,
-              pageLayoutMode: PdfPageLayoutMode.continuous,
-              onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-              setState(() {
-                _pageCount = details.document.pages.count;
-                _isLoading = false;
-              });
-
-              Future.delayed(const Duration(milliseconds: 800), () {
-                if (mounted) {
+            child: RepaintBoundary(
+              key: _pdfViewerKey,
+              child: SfPdfViewer.file(
+                File(widget.filePath),
+                controller: _pdfViewerController,
+                canShowScrollHead: false,
+                canShowScrollStatus: false,
+                pageLayoutMode: PdfPageLayoutMode.continuous,
+                onDocumentLoaded: (PdfDocumentLoadedDetails details) {
                   setState(() {
-                    _showLoadingScreen = false;
+                    _pageCount = details.document.pages.count;
+                    _isLoading = false;
                   });
-                }
-              });
 
-                // According to Task 1 Requirement: Always update lastAccessed timestamp when a document is successfully opened.
-                DatabaseHelper.instance.updateDocumentLastAccessed(widget.id);
-              },
-              onPageChanged: (PdfPageChangedDetails details) {
-                setState(() {
-                  _currentPage = details.newPageNumber;
-                });
-              },
+                  Future.delayed(const Duration(milliseconds: 800), () {
+                    if (mounted) {
+                      setState(() {
+                        _showLoadingScreen = false;
+                      });
+                    }
+                  });
+
+                  // According to Task 1 Requirement: Always update lastAccessed timestamp when a document is successfully opened.
+                  DatabaseHelper.instance.updateDocumentLastAccessed(widget.id);
+                },
+                onPageChanged: (PdfPageChangedDetails details) {
+                  setState(() {
+                    _currentPage = details.newPageNumber;
+                  });
+                },
+              ),
             ),
           ),
           if (!_isLoading && _pageCount > 0 && !_isFullScreen)
@@ -350,7 +426,10 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1A1A),
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: const Color(0xFF2A2A2A), width: 1),
+                    border: Border.all(
+                      color: const Color(0xFF2A2A2A),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -365,7 +444,10 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.rotate_right, color: Colors.white70),
+                        icon: const Icon(
+                          Icons.rotate_right,
+                          color: Colors.white70,
+                        ),
                         onPressed: () {
                           setState(() {
                             _quarterTurns = (_quarterTurns + 1) % 4;
@@ -390,7 +472,10 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                           backgroundColor: const Color(0xFF00E5FF),
                           foregroundColor: Colors.black,
                           onPressed: _showIntelSheet,
-                          child: const Icon(Icons.auto_awesome, color: Colors.black),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.black,
+                          ),
                         ),
                       ),
                     ],
@@ -441,21 +526,24 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> with TickerPr
                       Text(
                         'Opening your document...',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                       const SizedBox(height: 48),
                       if (settings.showReadingTips)
                         FadeTransition(
                           opacity: _fadeAnimation,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 40.0,
+                            ),
                             child: Text(
                               _selectedTip,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
                                     color: Colors.white54,
                                     fontStyle: FontStyle.italic,
                                   ),
