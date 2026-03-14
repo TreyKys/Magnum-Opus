@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
@@ -10,17 +11,16 @@ class AiService {
       throw Exception('GEMINI_API_KEY is missing from .env');
     }
 
-    _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: apiKey,
-    );
+    _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
   }
 
   Future<String> generateRAGResponse({
     required String contextChunks,
     required String userQuery,
+    Uint8List? imageBytes,
   }) async {
-    final systemInstruction = '''You are the Magnum Opus Intelligence. Append the SQLite chunks, then append the user's query. Send the payload using model.generateContent()
+    final systemInstruction =
+        '''You are the Magnum Opus Intelligence. Append the SQLite chunks, then append the user's query. Send the payload using model.generateContent()
 Your primary directive is to extract, synthesize, and clearly explain information based on the provided document chunks.
 
 Tone & Style: Professional, articulate, and helpful. Provide exhaustive, clearly explained, and precise answers. You may use a natural, conversational tone, but eliminate unnecessary fluff. Format your responses with clean spacing, bullet points, and bold text for readability.
@@ -109,7 +109,8 @@ Artificial intelligence alignment frameworks
 
 Advanced calculus & differential equations''';
 
-    final prompt = '''
+    final prompt =
+        '''
 $systemInstruction
 
 ---
@@ -122,8 +123,19 @@ $userQuery
 ''';
 
     try {
-      final response = await _model.generateContent([Content.text(prompt)]);
-      return response.text ?? "I could not generate a response. Please try again.";
+      Content content;
+      if (imageBytes != null) {
+        content = Content.multi([
+          TextPart(prompt),
+          DataPart('image/png', imageBytes),
+        ]);
+      } else {
+        content = Content.text(prompt);
+      }
+
+      final response = await _model.generateContent([content]);
+      return response.text ??
+          "I could not generate a response. Please try again.";
     } catch (e) {
       return "An error occurred while communicating with the AI: $e";
     }
