@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -42,6 +42,23 @@ CREATE TABLE document_chunks (
   document_id $textType,
   page_number $integerType,
   extracted_text $textType,
+  FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
+)
+''');
+    }
+    if (oldVersion < 3) {
+      const idType = 'TEXT PRIMARY KEY';
+      const textType = 'TEXT NOT NULL';
+      const integerType = 'INTEGER NOT NULL';
+
+      await db.execute('''
+CREATE TABLE chat_history (
+  id $idType,
+  document_id $textType,
+  message_text $textType,
+  is_user $integerType,
+  timestamp $textType,
+  is_pinned $integerType,
   FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
 )
 ''');
@@ -71,6 +88,18 @@ CREATE TABLE document_chunks (
   document_id $textType,
   page_number $integerType,
   extracted_text $textType,
+  FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
+)
+''');
+
+    await db.execute('''
+CREATE TABLE chat_history (
+  id $idType,
+  document_id $textType,
+  message_text $textType,
+  is_user $integerType,
+  timestamp $textType,
+  is_pinned $integerType,
   FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
 )
 ''');
@@ -180,6 +209,40 @@ CREATE TABLE document_chunks (
     }
 
     return buffer.toString();
+  }
+
+  Future<void> insertChatMessage(Map<String, dynamic> message) async {
+    final db = await instance.database;
+    await db.insert('chat_history', message, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getChatHistory(String documentId) async {
+    final db = await instance.database;
+    return await db.query(
+      'chat_history',
+      where: 'document_id = ?',
+      whereArgs: [documentId],
+      orderBy: 'timestamp ASC',
+    );
+  }
+
+  Future<void> clearChatHistory(String documentId) async {
+    final db = await instance.database;
+    await db.delete(
+      'chat_history',
+      where: 'document_id = ? AND is_pinned = 0',
+      whereArgs: [documentId],
+    );
+  }
+
+  Future<void> togglePinChatMessage(String messageId, bool isPinned) async {
+    final db = await instance.database;
+    await db.update(
+      'chat_history',
+      {'is_pinned': isPinned ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
   }
 
   Future<void> close() async {
