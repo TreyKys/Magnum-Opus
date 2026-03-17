@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:magnum_opus/features/vault/models/chat_message.dart';
 
 class AiService {
   late final GenerativeModel _model;
@@ -17,6 +18,7 @@ class AiService {
   Future<String> generateRAGResponse({
     required String contextChunks,
     required String userQuery,
+    required List<ChatMessage> history,
     Uint8List? imageBytes,
   }) async {
     final systemInstruction =
@@ -123,17 +125,30 @@ $userQuery
 ''';
 
     try {
-      Content content;
+      final List<Content> contents = [];
+
+      // Append conversational memory
+      for (final msg in history) {
+        if (msg.isUser) {
+          contents.add(Content.text(msg.text));
+        } else {
+          contents.add(Content.model([TextPart(msg.text)]));
+        }
+      }
+
+      // Append newest query
+      Content newestContent;
       if (imageBytes != null) {
-        content = Content.multi([
+        newestContent = Content.multi([
           TextPart(prompt),
           DataPart('image/png', imageBytes),
         ]);
       } else {
-        content = Content.text(prompt);
+        newestContent = Content.text(prompt);
       }
+      contents.add(newestContent);
 
-      final response = await _model.generateContent([content]);
+      final response = await _model.generateContent(contents);
       return response.text ??
           "I could not generate a response. Please try again.";
     } catch (e) {

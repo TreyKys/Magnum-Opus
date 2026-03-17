@@ -6,10 +6,16 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:markdown_widget/markdown_widget.dart';
+import 'package:markdown_widget/config/configs.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:markdown/markdown.dart' as m;
 
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
+import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 
 class PdfViewerScreen extends ConsumerStatefulWidget {
   final String id;
@@ -25,6 +31,97 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
+}
+
+class LatexSyntax extends m.InlineSyntax {
+  LatexSyntax() : super(r'\$(.+?)\$');
+
+  @override
+  bool onMatch(m.InlineParser parser, Match match) {
+    final latex = match[1];
+    if (latex != null) {
+      parser.addNode(m.Element.text('latex', latex));
+      return true;
+    }
+    return false;
+  }
+}
+
+class LatexBlockSyntax extends m.BlockSyntax {
+  @override
+  RegExp get pattern => RegExp(r'^\$\$(.*?)\$\$$', multiLine: true);
+
+  @override
+  m.Node parse(m.BlockParser parser) {
+    final match = pattern.firstMatch(parser.current.content);
+    final latex = match?[1] ?? '';
+    parser.advance();
+    return m.Element.text('latexBlock', latex);
+  }
+}
+
+class LatexBlockNode extends SpanNode {
+  final Map<String, String> attributes;
+  final String textContent;
+
+  LatexBlockNode(this.attributes, this.textContent);
+
+  @override
+  InlineSpan build() {
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Math.tex(
+          textContent,
+          textStyle: const TextStyle(fontSize: 16, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+
+class LatexBlockGenerator extends SpanNodeGeneratorWithTag {
+  LatexBlockGenerator() : super(tag: 'latexBlock', generator: (e, config, visitor) => LatexBlockNode(e.attributes, e.textContent));
+
+  @override
+  SpanNode build() {
+    return LatexBlockNode(
+      const {},
+      '', // Ignored since we parse manually
+    );
+  }
+}
+
+class LatexGenerator extends SpanNodeGeneratorWithTag {
+  LatexGenerator() : super(tag: 'latex', generator: (e, config, visitor) => LatexNode(e.attributes, e.textContent));
+
+  @override
+  SpanNode build() {
+    return LatexNode(
+      const {},
+      '', // Ignored since we parse manually
+    );
+  }
+}
+
+class LatexNode extends SpanNode {
+  final Map<String, String> attributes;
+  final String textContent;
+
+  LatexNode(this.attributes, this.textContent);
+
+  @override
+  InlineSpan build() {
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: Math.tex(
+        textContent,
+        textStyle: const TextStyle(fontSize: 16, color: Colors.white),
+      ),
+    );
+  }
 }
 
 class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
@@ -120,11 +217,51 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     }
   }
 
+  RewardedAd? _rewardedAd;
+  bool _isAdLoaded = false;
+
+  void _loadRewardedAd() {
+    // Official Google Test Ad Unit ID for Rewarded Ads
+    const adUnitId = 'ca-app-pub-3940256099942544/5224354917';
+
+    RewardedAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          _isAdLoaded = true;
+          _rewardedAd?.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _isAdLoaded = false;
+              _loadRewardedAd(); // Load the next one
+            },
+            onAdFailedToShowFullScreenContent: (ad, err) {
+              ad.dispose();
+              _isAdLoaded = false;
+              _loadRewardedAd();
+            },
+          );
+        },
+        onAdFailedToLoad: (err) {
+          _isAdLoaded = false;
+          // Retry later or handle failure
+        },
+      ),
+    );
+  }
+
   void _showIntelSheet() {
     if (_isFullScreen) {
       setState(() {
         _isFullScreen = false;
       });
+    }
+
+    // Pre-load an ad when opening the sheet
+    if (!_isAdLoaded) {
+      _loadRewardedAd();
     }
 
     showModalBottomSheet(
@@ -139,6 +276,8 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
           builder: (context, ref, child) {
             final chatMessages = ref.watch(chatProvider(widget.id));
             final chatNotifier = ref.read(chatProvider(widget.id).notifier);
+            final energy = ref.watch(energyProvider);
+            final energyNotifier = ref.read(energyProvider.notifier);
 
             // Auto-scroll to bottom when messages update
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -150,6 +289,58 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                 );
               }
             });
+
+            Future<void> _handleSend(String value) async {
+              if (value.trim().isEmpty) return;
+
+              if (energy <= 0) {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFF1E1E1E),
+                    title: const Text(
+                      "Intel Depleted",
+                      style: TextStyle(color: Colors.cyanAccent),
+                    ),
+                    content: const Text(
+                      "Supercharge the engine to continue.",
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text("CANCEL", style: TextStyle(color: Colors.white54)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          if (_isAdLoaded && _rewardedAd != null) {
+                            _rewardedAd?.show(
+                              onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+                                energyNotifier.refillEnergy();
+                              },
+                            );
+                          } else {
+                            // Fallback if ad is not loaded
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Engine charging... please try again in a moment.')),
+                            );
+                            _loadRewardedAd();
+                          }
+                        },
+                        child: const Text("SUPERCHARGE", style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
+              final imageBytes = await _capturePdfScreen();
+              await energyNotifier.consumeEnergy();
+              chatNotifier.sendMessage(value, imageBytes: imageBytes);
+              _chatController.clear();
+            }
 
             return FractionallySizedBox(
               heightFactor: 0.8,
@@ -168,7 +359,35 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    // Chat Persistence Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.bolt, color: Colors.cyanAccent, size: 20),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$energy Energy',
+                                style: const TextStyle(
+                                  color: Colors.cyanAccent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.white54),
+                            onPressed: () => chatNotifier.clearChat(),
+                            tooltip: 'Clear Chat',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Color(0xFF2A2A2A), height: 1),
                     Expanded(
                       child: ListView.builder(
                         controller: _chatScrollController,
@@ -210,35 +429,80 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                             alignment: msg.isUser
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: msg.isUser
-                                    ? Colors.cyanAccent
-                                    : const Color(0xFF1E1E1E),
-                                borderRadius: BorderRadius.circular(16)
-                                    .copyWith(
-                                      bottomRight: msg.isUser
-                                          ? Radius.zero
-                                          : const Radius.circular(16),
-                                      bottomLeft: !msg.isUser
-                                          ? Radius.zero
-                                          : const Radius.circular(16),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisAlignment: msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                              children: [
+                                if (!msg.isUser)
+                                  IconButton(
+                                    icon: Icon(
+                                      msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                                      color: msg.isPinned ? Colors.cyanAccent : Colors.white38,
+                                      size: 18,
                                     ),
-                              ),
-                              child: Text(
-                                msg.text,
-                                style: TextStyle(
-                                  color: msg.isUser
-                                      ? Colors.black
-                                      : Colors.white,
-                                  fontSize: 15,
+                                    onPressed: () {
+                                      chatNotifier.togglePin(msg.id, !msg.isPinned);
+                                    },
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                Flexible(
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: msg.isUser
+                                          ? Colors.cyanAccent
+                                          : const Color(0xFF1E1E1E),
+                                      borderRadius: BorderRadius.circular(16)
+                                          .copyWith(
+                                            bottomRight: msg.isUser
+                                                ? Radius.zero
+                                                : const Radius.circular(16),
+                                            bottomLeft: !msg.isUser
+                                                ? Radius.zero
+                                                : const Radius.circular(16),
+                                          ),
+                                    ),
+                                    child: msg.isUser
+                                        ? Text(
+                                            msg.text,
+                                            style: const TextStyle(
+                                              color: Colors.black,
+                                              fontSize: 15,
+                                            ),
+                                          )
+                                        : MarkdownWidget(
+                                            data: msg.text,
+                                            shrinkWrap: true,
+                                            physics: const NeverScrollableScrollPhysics(),
+                                            config: MarkdownConfig.darkConfig,
+                                            markdownGenerator: MarkdownGenerator(
+                                              generators: [LatexGenerator(), LatexBlockGenerator()],
+                                              inlineSyntaxList: [LatexSyntax()],
+                                              blockSyntaxList: [LatexBlockSyntax()],
+                                            ),
+                                          ),
+                                  ),
                                 ),
-                              ),
+                                if (msg.isUser)
+                                  IconButton(
+                                    icon: Icon(
+                                      msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                                      color: msg.isPinned ? Colors.cyanAccent : Colors.black54,
+                                      size: 18,
+                                    ),
+                                    onPressed: () {
+                                      chatNotifier.togglePin(msg.id, !msg.isPinned);
+                                    },
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                              ],
                             ),
                           );
                         },
@@ -261,16 +525,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                             child: TextField(
                               controller: _chatController,
                               textInputAction: TextInputAction.send,
-                              onSubmitted: (value) async {
-                                if (value.trim().isNotEmpty) {
-                                  final imageBytes = await _capturePdfScreen();
-                                  chatNotifier.sendMessage(
-                                    value,
-                                    imageBytes: imageBytes,
-                                  );
-                                  _chatController.clear();
-                                }
-                              },
+                              onSubmitted: _handleSend,
                               decoration: InputDecoration(
                                 hintText: "Ask the document...",
                                 hintStyle: const TextStyle(
@@ -309,16 +564,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                               Icons.send,
                               color: Colors.cyanAccent,
                             ),
-                            onPressed: () async {
-                              if (_chatController.text.trim().isNotEmpty) {
-                                final imageBytes = await _capturePdfScreen();
-                                chatNotifier.sendMessage(
-                                  _chatController.text,
-                                  imageBytes: imageBytes,
-                                );
-                                _chatController.clear();
-                              }
-                            },
+                            onPressed: () => _handleSend(_chatController.text),
                           ),
                         ],
                       ),
