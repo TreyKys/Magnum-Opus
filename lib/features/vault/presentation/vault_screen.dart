@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:myapp/features/vault/providers/vault_provider.dart';
-import 'package:myapp/features/vault/presentation/pdf_viewer_screen.dart';
+import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
+import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
 
 class VaultScreen extends ConsumerWidget {
   const VaultScreen({super.key});
@@ -19,7 +19,17 @@ class VaultScreen extends ConsumerWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('MAGNUM VAULT'),
+          title: const Text('Your Files 📁'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                // Navigate to SettingsScreen later
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+          ],
           bottom: TabBar(
             onTap: (index) {
               HapticFeedback.lightImpact();
