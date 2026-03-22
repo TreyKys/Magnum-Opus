@@ -71,7 +71,7 @@ class VaultNotifier extends Notifier<VaultState> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf'],
+        allowedExtensions: ['pdf', 'docx', 'xlsx', 'pptx'],
       );
 
       if (result != null && result.files.single.path != null) {

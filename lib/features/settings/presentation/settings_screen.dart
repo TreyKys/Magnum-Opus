@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
+import 'package:magnum_opus/features/onboarding/presentation/intro_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -30,14 +31,14 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: const Text('Vibrations for UI interactions.'),
                 value: settingsState.enableHaptics,
                 onChanged: settingsNotifier.toggleHaptics,
-                activeColor: Colors.cyanAccent,
+                activeThumbColor: Colors.cyanAccent,
               ),
               SwitchListTile(
                 title: const Text('Reading Tips'),
                 subtitle: const Text('Show helpful tips while loading documents.'),
                 value: settingsState.showReadingTips,
                 onChanged: settingsNotifier.toggleReadingTips,
-                activeColor: Colors.cyanAccent,
+                activeThumbColor: Colors.cyanAccent,
               ),
             ],
           ),
@@ -78,6 +79,19 @@ class SettingsScreen extends ConsumerWidget {
             context,
             'About',
             [
+              ListTile(
+                title: const Text('How to Use'),
+                subtitle: const Text('Replay the Magnum Opus tutorial.'),
+                trailing: const Icon(Icons.help_outline, color: Colors.cyanAccent),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const IntroScreen(fromSettings: true),
+                    ),
+                  );
+                },
+              ),
               const ListTile(
                 title: Text('Version'),
                 subtitle: Text('1.0.0 (Ignition Phase)'),

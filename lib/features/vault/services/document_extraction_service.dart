@@ -3,6 +3,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'dart:isolate';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/services/non_pdf_parser_service.dart';
 
 Future<List<Map<String, dynamic>>> extractPdfTextChunk(Map<String, dynamic> params) async {
   final String filePath = params['filePath'];
@@ -54,45 +55,90 @@ Future<List<Map<String, dynamic>>> extractPdfTextChunk(Map<String, dynamic> para
   return extractedChunks;
 }
 
+Future<List<Map<String, dynamic>>> extractNonPdfTextChunk(Map<String, dynamic> params) async {
+  final String filePath = params['filePath'];
+  final String documentId = params['documentId'];
+  final String ext = filePath.split('.').last.toLowerCase();
+
+  String text = '';
+  if (ext == 'docx') {
+    text = await NonPdfParserService.extractTextFromDocx(filePath);
+  } else if (ext == 'xlsx') {
+    text = await NonPdfParserService.extractTextFromXlsx(filePath);
+  } else if (ext == 'pptx') {
+    text = await NonPdfParserService.extractTextFromPptx(filePath);
+  }
+
+  // Non-PDFs are currently processed as a single large chunk (page 1) to save SQLite memory management complexity
+  return [{
+    'id': '${DateTime.now().millisecondsSinceEpoch}1',
+    'document_id': documentId,
+    'page_number': 1,
+    'extracted_text': text,
+  }];
+}
+
 class DocumentExtractionService {
   static const int chunkSize = 20;
 
   static Future<void> extractDocument(DocumentModel document, Function(String) onComplete) async {
-    final int totalPages = document.totalPages;
-    if (totalPages == 0) {
-      onComplete(document.id);
-      return;
-    }
+    final String ext = document.filePath.split('.').last.toLowerCase();
 
-    final int dbCount = await DatabaseHelper.instance.getExtractedPageCount(document.id);
-    if (dbCount >= totalPages) {
-       onComplete(document.id);
-       return;
-    }
+    if (ext == 'pdf') {
+      final int totalPages = document.totalPages;
+      if (totalPages == 0) {
+        onComplete(document.id);
+        return;
+      }
 
-    // Instead of spawning everything at once, we use Future.wait over chunks.
-    List<Future<void>> futures = [];
+      final int dbCount = await DatabaseHelper.instance.getExtractedPageCount(document.id);
+      if (dbCount >= totalPages) {
+         onComplete(document.id);
+         return;
+      }
 
-    for (int i = 1; i <= totalPages; i += chunkSize) {
-      final startPage = i;
-      final endPage = (i + chunkSize - 1) > totalPages ? totalPages : (i + chunkSize - 1);
+      // Instead of spawning everything at once, we use Future.wait over chunks.
+      List<Future<void>> futures = [];
+
+      for (int i = 1; i <= totalPages; i += chunkSize) {
+        final startPage = i;
+        final endPage = (i + chunkSize - 1) > totalPages ? totalPages : (i + chunkSize - 1);
+
+        final Map<String, dynamic> params = {
+          'filePath': document.filePath,
+          'startPage': startPage,
+          'endPage': endPage,
+          'documentId': document.id,
+        };
+
+        futures.add(_processChunk(params, isPdf: true));
+      }
+
+      await Future.wait(futures);
+    } else {
+      // Non-PDFs (DOCX, XLSX, PPTX) - Processed in a single background isolate chunk
+      final int dbCount = await DatabaseHelper.instance.getExtractedPageCount(document.id);
+      if (dbCount > 0) {
+         onComplete(document.id);
+         return;
+      }
 
       final Map<String, dynamic> params = {
         'filePath': document.filePath,
-        'startPage': startPage,
-        'endPage': endPage,
         'documentId': document.id,
       };
 
-      futures.add(_processChunk(params));
+      await _processChunk(params, isPdf: false);
     }
 
-    await Future.wait(futures);
     onComplete(document.id);
   }
 
-  static Future<void> _processChunk(Map<String, dynamic> params) async {
-    final List<Map<String, dynamic>> chunks = await Isolate.run(() => extractPdfTextChunk(params));
+  static Future<void> _processChunk(Map<String, dynamic> params, {required bool isPdf}) async {
+    final List<Map<String, dynamic>> chunks = isPdf
+        ? await Isolate.run(() => extractPdfTextChunk(params))
+        : await Isolate.run(() => extractNonPdfTextChunk(params));
+
     if (chunks.isNotEmpty) {
       await DatabaseHelper.instance.insertDocumentChunksBatch(chunks);
     }
