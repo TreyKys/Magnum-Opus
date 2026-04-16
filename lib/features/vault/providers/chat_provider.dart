@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/ai/ai_service.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
+import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
 
 final chatProvider = NotifierProvider.autoDispose
@@ -11,7 +12,7 @@ final chatProvider = NotifierProvider.autoDispose
     );
 
 class ChatNotifier extends Notifier<List<ChatMessage>> {
-  final String arg;
+  final String arg; // documentId
   ChatNotifier(this.arg);
 
   final AiService _aiService = AiService();
@@ -31,16 +32,13 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
   Future<void> clearChat() async {
     await DatabaseHelper.instance.clearChatHistory(arg);
-    // Reload messages to keep pinned ones
-    await _loadMessages();
+    await _loadMessages(); // Reload — pinned messages survive
   }
 
   Future<void> togglePin(String messageId, bool isPinned) async {
     await DatabaseHelper.instance.togglePinChatMessage(messageId, isPinned);
     state = state.map((msg) {
-      if (msg.id == messageId) {
-        return msg.copyWith(isPinned: isPinned);
-      }
+      if (msg.id == messageId) return msg.copyWith(isPinned: isPinned);
       return msg;
     }).toList();
   }
@@ -48,7 +46,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   Future<void> sendMessage(String query, {Uint8List? imageBytes}) async {
     if (query.trim().isEmpty) return;
 
-    // Record user message
+    // Record and display user message immediately
     final userMessage = ChatMessage(
       id: _uuid.v4(),
       documentId: arg,
@@ -56,29 +54,32 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       isUser: true,
       timestamp: DateTime.now(),
     );
-
     await DatabaseHelper.instance.insertChatMessage(userMessage.toMap());
-
-    // Instantly add user message to UI
     state = [...state, userMessage];
     isThinking = true;
 
     try {
-      // Step 1: Run getContextRichChunks from SQLite
-      final contextChunks = await DatabaseHelper.instance.getContextRichChunks(
-        arg,
-        query,
-      );
+      // Step 1: Top-15 context fetch from SQLite
+      final contextChunks =
+          await DatabaseHelper.instance.getContextRichChunks(arg, query);
 
-      // Step 2: Send payload to Gemini
+      // Step 2: Load global skeleton (macro-context)
+      final skeleton = await DatabaseHelper.instance.getDocumentSkeleton(arg);
+
+      // Step 3: Read current complexity level
+      final complexity = ref.read(complexityProvider);
+
+      // Step 4: Send to Gemini with full context
       final response = await _aiService.generateRAGResponse(
         contextChunks: contextChunks,
         userQuery: query,
-        history: state.where((msg) => msg.id != userMessage.id).toList(), // exclude current message
+        history: state.where((msg) => msg.id != userMessage.id).toList(),
         imageBytes: imageBytes,
+        complexity: complexity,
+        documentSkeleton: skeleton,
       );
 
-      // Step 3: Record AI response
+      // Step 5: Record and display AI response
       final aiMessage = ChatMessage(
         id: _uuid.v4(),
         documentId: arg,
@@ -87,14 +88,12 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         timestamp: DateTime.now(),
       );
       await DatabaseHelper.instance.insertChatMessage(aiMessage.toMap());
-
-      // Display response
       state = [...state, aiMessage];
     } catch (e) {
       final errorMessage = ChatMessage(
         id: _uuid.v4(),
         documentId: arg,
-        text: "Error communicating with intelligence module: $e",
+        text: 'Error communicating with intelligence module: $e',
         isUser: false,
         timestamp: DateTime.now(),
       );

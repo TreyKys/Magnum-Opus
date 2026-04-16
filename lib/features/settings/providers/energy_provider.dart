@@ -6,16 +6,17 @@ final energyProvider = NotifierProvider<EnergyNotifier, int>(() => EnergyNotifie
 class EnergyNotifier extends Notifier<int> {
   static const String _energyKey = 'user_energy_charges';
   static const String _lastResetKey = 'last_energy_reset_date';
-  static const String _adsWatchedKey = 'ads_watched_count';
 
   static const int _maxFreeEnergy = 5;
+  // Flat rate: every rewarded ad grants exactly 2 queries — no exponential compounding.
+  static const int _adReward = 2;
 
   late SharedPreferences _prefs;
 
   @override
   int build() {
     _init();
-    return 0; // Temporary before initialization
+    return 0; // Temporary before async init
   }
 
   Future<void> _init() async {
@@ -26,13 +27,11 @@ class EnergyNotifier extends Notifier<int> {
     final todayStr = '${now.year}-${now.month}-${now.day}';
 
     if (lastResetStr != todayStr) {
-      // New calendar day, reset energy and ad count
+      // New calendar day — reset to free allocation
       await _prefs.setString(_lastResetKey, todayStr);
       await _prefs.setInt(_energyKey, _maxFreeEnergy);
-      await _prefs.setInt(_adsWatchedKey, 0);
       state = _maxFreeEnergy;
     } else {
-      // Same day, load existing energy
       state = _prefs.getInt(_energyKey) ?? _maxFreeEnergy;
     }
   }
@@ -45,18 +44,9 @@ class EnergyNotifier extends Notifier<int> {
     }
   }
 
+  /// Flat reward: 1 ad = 2 queries, always. No counters, no compounding.
   Future<void> refillEnergy() async {
-    int adsWatched = _prefs.getInt(_adsWatchedKey) ?? 0;
-
-    // Exponential ratio: 2, 4, 8, 16...
-    // adsWatched = 0 -> 2 energy
-    // adsWatched = 1 -> 4 energy
-    // adsWatched = 2 -> 8 energy
-    int reward = 2 << adsWatched;
-
-    await _prefs.setInt(_adsWatchedKey, adsWatched + 1);
-
-    final newValue = state + reward;
+    final newValue = state + _adReward;
     await _prefs.setInt(_energyKey, newValue);
     state = newValue;
   }
