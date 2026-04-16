@@ -1,11 +1,9 @@
-import 'dart:io';
 import 'dart:math';
-import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:markdown_widget/config/configs.dart';
@@ -14,16 +12,17 @@ import 'package:markdown/markdown.dart' as m;
 
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
+import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
 import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
 
-// ─── LaTeX rendering (unchanged from v1) ─────────────────────────────────────
-
-class LatexSyntax extends m.InlineSyntax {
-  LatexSyntax() : super(r'\$(.+?)\$');
+// Reuse LaTeX syntax classes from pdf_viewer_screen
+class _LatexSyntax extends m.InlineSyntax {
+  _LatexSyntax() : super(r'\$(.+?)\$');
   @override
   bool onMatch(m.InlineParser parser, Match match) {
     final latex = match[1];
@@ -35,7 +34,7 @@ class LatexSyntax extends m.InlineSyntax {
   }
 }
 
-class LatexBlockSyntax extends m.BlockSyntax {
+class _LatexBlockSyntax extends m.BlockSyntax {
   @override
   RegExp get pattern => RegExp(r'^\$\$(.*?)\$\$$', multiLine: true);
   @override
@@ -47,45 +46,10 @@ class LatexBlockSyntax extends m.BlockSyntax {
   }
 }
 
-class LatexBlockNode extends SpanNode {
+class _LatexNode extends SpanNode {
   final Map<String, String> attributes;
   final String textContent;
-  LatexBlockNode(this.attributes, this.textContent);
-  @override
-  InlineSpan build() => WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Math.tex(textContent,
-              textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
-        ),
-      );
-}
-
-class LatexBlockGenerator extends SpanNodeGeneratorWithTag {
-  LatexBlockGenerator()
-      : super(
-            tag: 'latexBlock',
-            generator: (e, config, visitor) =>
-                LatexBlockNode(e.attributes, e.textContent));
-  @override
-  SpanNode build() => LatexBlockNode(const {}, '');
-}
-
-class LatexGenerator extends SpanNodeGeneratorWithTag {
-  LatexGenerator()
-      : super(
-            tag: 'latex',
-            generator: (e, config, visitor) =>
-                LatexNode(e.attributes, e.textContent));
-  @override
-  SpanNode build() => LatexNode(const {}, '');
-}
-
-class LatexNode extends SpanNode {
-  final Map<String, String> attributes;
-  final String textContent;
-  LatexNode(this.attributes, this.textContent);
+  _LatexNode(this.attributes, this.textContent);
   @override
   InlineSpan build() => WidgetSpan(
         alignment: PlaceholderAlignment.middle,
@@ -94,37 +58,58 @@ class LatexNode extends SpanNode {
       );
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-
-class PdfViewerScreen extends ConsumerStatefulWidget {
-  final String id;
-  final String filePath;
-  final String title;
-
-  const PdfViewerScreen({
-    super.key,
-    required this.id,
-    required this.filePath,
-    required this.title,
-  });
-
+class _LatexBlockNode extends SpanNode {
+  final Map<String, String> attributes;
+  final String textContent;
+  _LatexBlockNode(this.attributes, this.textContent);
   @override
-  ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
+  InlineSpan build() => WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Math.tex(textContent,
+              textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
+        ),
+      );
 }
 
-class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
-    with TickerProviderStateMixin {
-  final PdfViewerController _pdfViewerController = PdfViewerController();
-  final TextEditingController _chatController = TextEditingController();
-  final GlobalKey _pdfViewerKey = GlobalKey();
-  final ScrollController _chatScrollController = ScrollController();
+class _LatexGenerator extends SpanNodeGeneratorWithTag {
+  _LatexGenerator()
+      : super(
+            tag: 'latex',
+            generator: (e, config, visitor) =>
+                _LatexNode(e.attributes, e.textContent));
+  @override
+  SpanNode build() => _LatexNode(const {}, '');
+}
 
-  int _currentPage = 1;
-  int _pageCount = 0;
-  bool _isLoading = true;
-  bool _showLoadingScreen = true;
-  int _quarterTurns = 0;
-  bool _isFullScreen = false;
+class _LatexBlockGenerator extends SpanNodeGeneratorWithTag {
+  _LatexBlockGenerator()
+      : super(
+            tag: 'latexBlock',
+            generator: (e, config, visitor) =>
+                _LatexBlockNode(e.attributes, e.textContent));
+  @override
+  SpanNode build() => _LatexBlockNode(const {}, '');
+}
+
+class DocumentViewScreen extends ConsumerStatefulWidget {
+  final DocumentModel document;
+
+  const DocumentViewScreen({super.key, required this.document});
+
+  @override
+  ConsumerState<DocumentViewScreen> createState() => _DocumentViewScreenState();
+}
+
+class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
+    with TickerProviderStateMixin {
+  final TextEditingController _chatController = TextEditingController();
+  final ScrollController _chatScrollController = ScrollController();
+  final GlobalKey _contentKey = GlobalKey();
+
+  bool _isIndexing = false;
+  String _firstChunkPreview = '';
 
   late AnimationController _hoverController;
   late Animation<double> _hoverAnimation;
@@ -132,8 +117,11 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
   late Animation<double> _fadeAnimation;
 
   String _selectedTip = '';
+  bool _showLoadingScreen = true;
 
-  // Reading tips (preserved from v1, app-specific entries updated)
+  RewardedAd? _rewardedAd;
+  bool _isAdLoaded = false;
+
   static const List<String> _tips = [
     'Use active recall and spaced repetition to remember document content.',
     'Highlight sparingly; it helps important text stand out more effectively.',
@@ -144,36 +132,25 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     'Look up unfamiliar words immediately to avoid losing context.',
     'Discussing what you read with others solidifies your understanding.',
     'Ask questions of the text as you read to stay actively engaged.',
-    'Create a glossary of key terms for complex or technical documents.',
     'Magnum Opus uses a Swarm Engine for high-performance background extraction.',
     'The vault never drops a frame, keeping your UI 100% responsive.',
     'All data stays on your device. Zero external servers. Complete privacy.',
     'Magnum Opus leverages Isolate spawning to handle massive documents efficiently.',
     'Our custom SQLite schema ensures instant recovery even if interrupted.',
-    'The Complexity Dial scales AI depth from ELI5 to full PhD — try it!',
-    'Magnum Opus dynamically chunks document data to prevent memory leaks.',
-    'Your reading progress and recent documents are intelligently tracked.',
     'Background processes automatically retry if the app is unexpectedly closed.',
-    'Powered by Riverpod state management for flawless, reactive UI updates.',
   ];
-
-  RewardedAd? _rewardedAd;
-  bool _isAdLoaded = false;
 
   @override
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final settings = ref.read(settingsProvider);
-      _pdfViewerController.zoomLevel = settings.defaultZoomLevel;
-    });
+    _selectedTip = _tips[Random().nextInt(_tips.length)];
 
     _hoverController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    _hoverAnimation = Tween<double>(begin: -15, end: 15).animate(
+    _hoverAnimation = Tween<double>(begin: -12, end: 12).animate(
       CurvedAnimation(parent: _hoverController, curve: Curves.easeInOut),
     );
 
@@ -184,19 +161,46 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
     );
-
-    _selectedTip = _tips[Random().nextInt(_tips.length)];
     _fadeController.forward();
+
+    _loadPreview();
   }
 
-  Future<Uint8List?> _capturePdfScreen() async {
+  Future<void> _loadPreview() async {
+    final db = DatabaseHelper.instance;
+    final chunks = await db.database.then((d) => d.query(
+          'document_chunks',
+          where: 'document_id = ?',
+          whereArgs: [widget.document.id],
+          orderBy: 'page_number ASC',
+          limit: 1,
+        ));
+
+    String preview = '';
+    if (chunks.isNotEmpty) {
+      final text = chunks.first['extracted_text'] as String;
+      preview = text.length > 800 ? '${text.substring(0, 800)}...' : text;
+    }
+
+    if (mounted) {
+      setState(() {
+        _firstChunkPreview = preview;
+        _showLoadingScreen = preview.isEmpty; // Still loading if no content yet
+      });
+
+      if (!_showLoadingScreen) {
+        DatabaseHelper.instance.updateDocumentLastAccessed(widget.document.id);
+      }
+    }
+  }
+
+  Future<Uint8List?> _captureContentScreen() async {
     try {
-      final boundary = _pdfViewerKey.currentContext?.findRenderObject()
+      final boundary = _contentKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
       if (boundary == null) return null;
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      final image = await boundary.toImage(pixelRatio: 2.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (_) {
       return null;
@@ -225,13 +229,14 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
             },
           );
         },
-        onAdFailedToLoad: (_) => _isAdLoaded = false,
+        onAdFailedToLoad: (_) {
+          _isAdLoaded = false;
+        },
       ),
     );
   }
 
   void _showIntelSheet() {
-    if (_isFullScreen) setState(() => _isFullScreen = false);
     if (!_isAdLoaded) _loadRewardedAd();
 
     showModalBottomSheet(
@@ -244,9 +249,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
       builder: (context) {
         return Consumer(
           builder: (context, ref, child) {
-            final chatMessages = ref.watch(chatProvider(widget.id));
+            final chatMessages = ref.watch(chatProvider(widget.document.id));
             final chatNotifier =
-                ref.read(chatProvider(widget.id).notifier);
+                ref.read(chatProvider(widget.document.id).notifier);
             final energy = ref.watch(energyProvider);
             final energyNotifier = ref.read(energyProvider.notifier);
 
@@ -269,8 +274,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                     backgroundColor: AppTheme.surface,
                     title: const Text('Intel Depleted',
                         style: TextStyle(color: AppTheme.accentBlueLight)),
-                    content: const Text(
-                        'Supercharge the engine to continue.',
+                    content: const Text('Supercharge the engine to continue.',
                         style: TextStyle(color: Colors.white70)),
                     actions: [
                       TextButton(
@@ -305,7 +309,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                 );
                 return;
               }
-              final imageBytes = await _capturePdfScreen();
+              final imageBytes = await _captureContentScreen();
               await energyNotifier.consumeEnergy();
               chatNotifier.sendMessage(value, imageBytes: imageBytes);
               _chatController.clear();
@@ -327,7 +331,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    // Header: energy + complexity + clear
+                    // Header: energy + clear + complexity
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -364,7 +368,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         ],
                       ),
                     ),
-                    // Compile Report bar (only when messages exist)
+                    // Compile Report bar
                     if (chatMessages.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -385,7 +389,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                             TextButton(
                               onPressed: () => ExportService.exportChatAsPdf(
                                 context,
-                                widget.title,
+                                widget.document.title,
                                 chatMessages,
                               ),
                               child: const Text(
@@ -401,7 +405,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         ),
                       ),
                     const Divider(color: AppTheme.border, height: 1),
-                    // Messages list
+                    // Messages
                     Expanded(
                       child: ListView.builder(
                         controller: _chatScrollController,
@@ -419,8 +423,8 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: AppTheme.surface,
-                                  borderRadius:
-                                      BorderRadius.circular(16).copyWith(
+                                  borderRadius: BorderRadius.circular(16)
+                                      .copyWith(
                                           bottomLeft: Radius.zero),
                                 ),
                                 child: const SizedBox(
@@ -439,7 +443,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         },
                       ),
                     ),
-                    // Input bar
+                    // Input
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
@@ -515,7 +519,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
           if (!msg.isUser)
             IconButton(
               icon: Icon(
-                msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                msg.isPinned
+                    ? Icons.push_pin
+                    : Icons.push_pin_outlined,
                 color: msg.isPinned
                     ? AppTheme.accentBlueLight
                     : Colors.white38,
@@ -556,11 +562,11 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                       config: MarkdownConfig.darkConfig,
                       markdownGenerator: MarkdownGenerator(
                         generators: [
-                          LatexGenerator(),
-                          LatexBlockGenerator()
+                          _LatexGenerator(),
+                          _LatexBlockGenerator()
                         ],
-                        inlineSyntaxList: [LatexSyntax()],
-                        blockSyntaxList: [LatexBlockSyntax()],
+                        inlineSyntaxList: [_LatexSyntax()],
+                        blockSyntaxList: [_LatexBlockSyntax()],
                       ),
                     ),
             ),
@@ -568,7 +574,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
           if (msg.isUser)
             IconButton(
               icon: Icon(
-                msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                msg.isPinned
+                    ? Icons.push_pin
+                    : Icons.push_pin_outlined,
                 color: msg.isPinned
                     ? AppTheme.accentBlueLight
                     : Colors.white54,
@@ -587,7 +595,6 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
 
   @override
   void dispose() {
-    _pdfViewerController.dispose();
     _chatController.dispose();
     _chatScrollController.dispose();
     _hoverController.dispose();
@@ -599,142 +606,201 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final vaultState = ref.watch(vaultProvider);
+    _isIndexing = vaultState.indexingDocumentIds.contains(widget.document.id);
+
+    // Once indexing finishes, reload preview
+    if (!_isIndexing && _showLoadingScreen) {
+      _loadPreview();
+    }
+
+    final fileTypeLabel = widget.document.fileType.toUpperCase();
+    final fileTypeColor = _colorForType(widget.document.fileType);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: _isFullScreen
-          ? null
-          : AppBar(
-              title: Text(
-                widget.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 16),
-              ),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pop(context),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.zoom_in),
-                  onPressed: () {
-                    _pdfViewerController.zoomLevel =
-                        _pdfViewerController.zoomLevel + 0.25;
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.zoom_out),
-                  onPressed: () {
-                    _pdfViewerController.zoomLevel =
-                        _pdfViewerController.zoomLevel - 0.25;
-                  },
-                ),
-              ],
-            ),
+      appBar: AppBar(
+        title: Text(
+          widget.document.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 16),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Stack(
         children: [
-          // PDF Viewer
-          RotatedBox(
-            quarterTurns: _quarterTurns,
-            child: RepaintBoundary(
-              key: _pdfViewerKey,
-              child: SfPdfViewer.file(
-                File(widget.filePath),
-                controller: _pdfViewerController,
-                canShowScrollHead: false,
-                canShowScrollStatus: false,
-                pageLayoutMode: PdfPageLayoutMode.continuous,
-                onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                  setState(() {
-                    _pageCount = details.document.pages.count;
-                    _isLoading = false;
-                  });
-                  Future.delayed(const Duration(milliseconds: 800), () {
-                    if (mounted) setState(() => _showLoadingScreen = false);
-                  });
-                  DatabaseHelper.instance
-                      .updateDocumentLastAccessed(widget.id);
-                },
-                onPageChanged: (PdfPageChangedDetails details) {
-                  setState(() => _currentPage = details.newPageNumber);
-                },
+          // Content
+          RepaintBoundary(
+            key: _contentKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Metadata card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: fileTypeColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(_iconForType(widget.document.fileType),
+                              color: fileTypeColor, size: 28),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.document.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: fileTypeColor.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      fileTypeLabel,
+                                      style: TextStyle(
+                                        color: fileTypeColor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${widget.document.fileSizeMb.toStringAsFixed(1)} MB',
+                                    style: const TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${widget.document.totalPages} chunks',
+                                    style: const TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Content preview
+                  if (_firstChunkPreview.isNotEmpty) ...[
+                    const Text(
+                      'CONTENT PREVIEW',
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Text(
+                        _firstChunkPreview,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                          height: 1.7,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 100), // Space for floating button
+                ],
               ),
             ),
           ),
-          // Control bar
-          if (!_isLoading && _pageCount > 0 && !_isFullScreen)
+          // Intel button
+          if (!_isIndexing)
             Positioned(
               bottom: 32,
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  height: 60,
+                  height: 56,
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(28),
                     border: Border.all(color: AppTheme.border),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.fullscreen,
-                            color: Colors.white70),
-                        onPressed: () =>
-                            setState(() => _isFullScreen = true),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.rotate_right,
-                            color: Colors.white70),
-                        onPressed: () => setState(
-                            () => _quarterTurns = (_quarterTurns + 1) % 4),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$_currentPage / $_pageCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                       const SizedBox(width: 16),
-                      Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        child: FloatingActionButton(
-                          mini: true,
-                          elevation: 0,
-                          backgroundColor: AppTheme.accentBlue,
-                          foregroundColor: Colors.white,
-                          onPressed: _showIntelSheet,
-                          child: const Icon(Icons.auto_awesome),
+                      if (_isIndexing) ...[
+                        const _PulsingDot(),
+                        const SizedBox(width: 8),
+                        const Text('Indexing...',
+                            style: TextStyle(
+                                color: AppTheme.accentBlueLight,
+                                fontSize: 13)),
+                        const SizedBox(width: 12),
+                      ] else
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          child: FloatingActionButton(
+                            mini: true,
+                            elevation: 0,
+                            backgroundColor: AppTheme.accentBlue,
+                            foregroundColor: Colors.white,
+                            onPressed: _showIntelSheet,
+                            child: const Icon(Icons.auto_awesome),
+                          ),
                         ),
-                      ),
+                      const SizedBox(width: 8),
                     ],
                   ),
                 ),
               ),
             ),
-          // Full-screen exit
-          if (_isFullScreen)
-            Positioned(
-              bottom: 32,
-              right: 32,
-              child: FloatingActionButton(
-                backgroundColor: Colors.black.withOpacity(0.5),
-                elevation: 0,
-                onPressed: () => setState(() => _isFullScreen = false),
-                child: const Icon(Icons.fullscreen_exit, color: Colors.white),
-              ),
-            ),
-          // Loading screen with tips (preserved from v1)
-          if (_showLoadingScreen)
+          // Loading / indexing screen
+          if (_showLoadingScreen || _isIndexing)
             AnimatedOpacity(
-              opacity: _isLoading ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 800),
+              opacity: (_showLoadingScreen || _isIndexing) ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 600),
               child: Container(
                 color: AppTheme.background,
                 child: Center(
@@ -743,45 +809,44 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                     children: [
                       AnimatedBuilder(
                         animation: _hoverAnimation,
-                        builder: (context, child) => Transform.translate(
+                        builder: (_, child) => Transform.translate(
                           offset: Offset(0, _hoverAnimation.value),
                           child: child,
                         ),
-                        child: const Icon(
-                          Icons.picture_as_pdf_outlined,
-                          size: 90,
-                          color: AppTheme.accentBlue,
+                        child: Icon(
+                          _iconForType(widget.document.fileType),
+                          size: 80,
+                          color: fileTypeColor,
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
                       Text(
-                        'Opening your document...',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
+                        _isIndexing
+                            ? widget.document.fileType == 'audio'
+                                ? 'Transcribing audio...'
+                                : widget.document.fileType == 'url'
+                                    ? 'Scraping content...'
+                                    : 'Indexing document...'
+                            : 'Loading...',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: Colors.white70,
                               fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
                             ),
                       ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 40),
                       if (settings.showReadingTips)
                         FadeTransition(
                           opacity: _fadeAnimation,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 40.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 40),
                             child: Text(
                               _selectedTip,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: Colors.white54,
-                                    fontStyle: FontStyle.italic,
-                                  ),
+                              style:
+                                  Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white54,
+                                        fontStyle: FontStyle.italic,
+                                      ),
                             ),
                           ),
                         ),
@@ -791,6 +856,95 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  static Color _colorForType(String type) {
+    switch (type) {
+      case 'epub':
+        return AppTheme.badgeEpub;
+      case 'docx':
+        return AppTheme.badgeDocx;
+      case 'xlsx':
+        return AppTheme.badgeXlsx;
+      case 'pptx':
+        return AppTheme.badgePptx;
+      case 'csv':
+        return AppTheme.badgeCsv;
+      case 'txt':
+        return AppTheme.badgeTxt;
+      case 'audio':
+        return AppTheme.badgeAudio;
+      case 'url':
+        return AppTheme.badgeUrl;
+      default:
+        return AppTheme.badgePdf;
+    }
+  }
+
+  static IconData _iconForType(String type) {
+    switch (type) {
+      case 'epub':
+        return Icons.menu_book_outlined;
+      case 'docx':
+        return Icons.description_outlined;
+      case 'xlsx':
+        return Icons.table_chart_outlined;
+      case 'pptx':
+        return Icons.slideshow_outlined;
+      case 'csv':
+        return Icons.grid_on_outlined;
+      case 'txt':
+        return Icons.text_snippet_outlined;
+      case 'audio':
+        return Icons.headphones_outlined;
+      case 'url':
+        return Icons.language_outlined;
+      default:
+        return Icons.picture_as_pdf_outlined;
+    }
+  }
+}
+
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot();
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Opacity(
+        opacity: 0.3 + (_ctrl.value * 0.7),
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(
+            color: AppTheme.accentBlueLight,
+            shape: BoxShape.circle,
+          ),
+        ),
       ),
     );
   }

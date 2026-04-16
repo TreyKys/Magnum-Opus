@@ -11,112 +11,76 @@ class AiService {
     if (apiKey == null || apiKey.isEmpty) {
       throw Exception('GEMINI_API_KEY is missing from .env');
     }
-
     _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
   }
+
+  // ─── Complexity-Aware System Prompt ───────────────────────────────────────
+
+  String _complexityInstruction(int complexity) {
+    if (complexity <= 15) {
+      return 'COMPLEXITY LEVEL: ELI5 (Explain Like I\'m 5). Use extremely simple language. '
+          'Use everyday analogies and real-world comparisons a child could understand. '
+          'Avoid all jargon and technical terms. Short sentences only.';
+    } else if (complexity <= 35) {
+      return 'COMPLEXITY LEVEL: Elementary. Explain clearly and accessibly for a general '
+          'audience with no specialist background. Minimal jargon — define any technical '
+          'terms you must use. Favour clarity over completeness.';
+    } else if (complexity <= 60) {
+      return 'COMPLEXITY LEVEL: Balanced. Professional, structured, and informative. '
+          'Suitable for an educated adult. Use domain terminology where helpful but '
+          'always explain it contextually.';
+    } else if (complexity <= 80) {
+      return 'COMPLEXITY LEVEL: Advanced. Provide in-depth technical analysis. '
+          'Use precise domain terminology freely. Assume familiarity with the field. '
+          'Include nuance, caveats, and methodological detail.';
+    } else {
+      return 'COMPLEXITY LEVEL: PhD / Expert. Respond at full academic rigour. '
+          'Assume complete domain mastery. Use rigorous field-specific terminology, '
+          'mathematical formulations where relevant, cite specific mechanisms, '
+          'frameworks, or theoretical models. Do not simplify.';
+    }
+  }
+
+  // ─── Main RAG Response ────────────────────────────────────────────────────
 
   Future<String> generateRAGResponse({
     required String contextChunks,
     required String userQuery,
     required List<ChatMessage> history,
     Uint8List? imageBytes,
+    int complexity = 50,
+    String? documentSkeleton,
   }) async {
-    final systemInstruction =
-        '''You are the Magnum Opus Intelligence. Append the SQLite chunks, then append the user's query. Send the payload using model.generateContent()
-Your primary directive is to extract, synthesize, and clearly explain information based on the provided document chunks.
+    final complexityBlock = _complexityInstruction(complexity);
 
-Tone & Style: Professional, articulate, and helpful. Provide exhaustive, clearly explained, and precise answers. You may use a natural, conversational tone, but eliminate unnecessary fluff. Format your responses with clean spacing, bullet points, and bold text for readability.
+    final skeletonBlock = documentSkeleton != null && documentSkeleton.isNotEmpty
+        ? '''
+DOCUMENT OVERVIEW (Global Context — always keep this in mind):
+$documentSkeleton
 
-Fallback Protocol: You must always provide a highly useful response. If the exact answer to the user's query is NOT fully contained within the provided document chunks, you must clearly state that up front (e.g., 'The provided document does not explicitly state this, however...'). Then, seamlessly pivot to answering the question using your own verified, factual knowledge, tying it back to any related context that is in the document.
+'''
+        : '';
 
-Precision Mandate: When analyzing or explaining complex, specialized data, you must prioritize absolute structural accuracy, logical flow, and exhaustive detail. This mandate applies to all advanced domains, specifically including but not limited to:
+    final systemInstruction = '''
+$complexityBlock
 
-Smart contract architecture & decentralized protocols
+You are the Magnum Opus Intelligence Engine.
+Your primary directive is to extract, synthesise, and clearly explain information based on the provided document context.
 
-Pharmacokinetics & compounding formulas
+Tone & Style: Professional, articulate, and helpful. Provide exhaustive, clearly explained, and precise answers. Format responses with clean spacing, bullet points, and bold text for readability. Adapt depth strictly to the COMPLEXITY LEVEL above.
 
-Cybersecurity vulnerability reports & zero-day exploits
+Fallback Protocol: Always provide a useful response. If the answer is NOT fully in the provided chunks, clearly state that, then pivot to answering using your own verified knowledge, tying back to related context.
 
-Technical analysis & algorithmic trading models
+Citation Mandate: Always end your response with a "Sources" section listing the specific pages you drew from, formatted as:
+[Source: Page N · Document Title] or [Source: Page N]
 
-Cryptographic encryption protocols
+Precision Mandate: Prioritise structural accuracy and logical flow across all advanced domains including but not limited to: smart contracts, pharmacokinetics, cybersecurity, algorithmic trading, cryptography, quantum mechanics, constitutional law, ML/neural networks, aerospace, biochemistry, civil engineering, genomics, macroeconomics, distributed systems, thermodynamics, tax law, materials science, medical imaging, renewable energy, actuarial science, epidemiology, organic chemistry, HFT, nanotechnology, paleontology, telecom, urban planning, quantum computing, veterinary pathology, agronomy, behavioural statistics, microprocessor architecture, oceanography, linguistics, SMC/liquidity mechanics, AI alignment, advanced calculus.''';
 
-Quantum mechanics & particle physics
-
-Constitutional law & legal precedents
-
-Machine learning tensor operations & neural networks
-
-Aerospace aerodynamics & orbital mechanics
-
-Biochemical pathways & molecular biology
-
-Civil engineering load calculations
-
-Genetic sequencing & bioinformatics
-
-Macroeconomic monetary policies
-
-Distributed ledger consensus mechanisms
-
-Software system architectures
-
-Supply chain logistics & operations research
-
-Thermodynamics & fluid dynamics
-
-Tax code regulations & corporate compliance
-
-Material science crystallography
-
-Medical diagnostic imaging reports
-
-Renewable energy grid distributions
-
-Actuarial risk assessments
-
-Epidemiological modeling
-
-Geopolitical treaty frameworks
-
-Organic chemistry syntheses
-
-High-frequency trading algorithms
-
-Nanotechnology schematics
-
-Paleontological stratigraphy
-
-Telecommunications frequency bands
-
-Urban planning & zoning ordinances
-
-Quantum computing qubit logic
-
-Veterinary pathology reports
-
-Agronomy & soil compositions
-
-Behavioral psychology statistical analyses
-
-Microprocessor architecture diagrams
-
-Oceanographic & tectonic shift data
-
-Linguistics & syntactic tree mapping
-
-Smart money concepts (SMC) & liquidity mechanics
-
-Artificial intelligence alignment frameworks
-
-Advanced calculus & differential equations''';
-
-    final prompt =
-        '''
+    final prompt = '''
 $systemInstruction
 
 ---
-DOCUMENT CHUNKS:
+${skeletonBlock}DOCUMENT CHUNKS:
 $contextChunks
 
 ---
@@ -127,7 +91,7 @@ $userQuery
     try {
       final List<Content> contents = [];
 
-      // Append conversational memory
+      // Conversational memory
       for (final msg in history) {
         if (msg.isUser) {
           contents.add(Content.text(msg.text));
@@ -136,7 +100,7 @@ $userQuery
         }
       }
 
-      // Append newest query
+      // Newest query — with optional Sniper Vision image
       Content newestContent;
       if (imageBytes != null) {
         newestContent = Content.multi([
@@ -149,10 +113,56 @@ $userQuery
       contents.add(newestContent);
 
       final response = await _model.generateContent(contents);
-      return response.text ??
-          "I could not generate a response. Please try again.";
+      return response.text ?? 'I could not generate a response. Please try again.';
     } catch (e) {
-      return "An error occurred while communicating with the AI: $e";
+      return 'An error occurred while communicating with the AI: $e';
+    }
+  }
+
+  // ─── Audio Transcription ──────────────────────────────────────────────────
+
+  /// Sends raw audio bytes to Gemini 2.5 Flash for native transcription.
+  /// Returns the full transcript text.
+  Future<String> transcribeAudio(Uint8List audioBytes, String mimeType) async {
+    try {
+      final response = await _model.generateContent([
+        Content.multi([
+          TextPart(
+            'Please transcribe this audio verbatim and completely. '
+            'If multiple speakers are present, label them as Speaker 1, Speaker 2, etc. '
+            'Format with timestamps every 60 seconds where possible (e.g. [00:60]). '
+            'Do not summarise — output the full transcript.',
+          ),
+          DataPart(mimeType, audioBytes),
+        ]),
+      ]);
+      return response.text ?? '';
+    } catch (e) {
+      throw Exception('Audio transcription failed: $e');
+    }
+  }
+
+  // ─── Global Skeleton Generator ────────────────────────────────────────────
+
+  /// Generates a 200-word macro-context summary of the document.
+  /// Called once after extraction completes; stored in the documents table.
+  Future<String> generateSkeleton(String sampleChunks) async {
+    try {
+      final response = await _model.generateContent([
+        Content.text(
+          'You are summarising a document for a RAG system. '
+          'Based on the following text samples from throughout the document, '
+          'write a concise 150–200 word overview that captures: '
+          '(1) the document\'s core thesis or purpose, '
+          '(2) the main topics covered, '
+          '(3) the intended audience or context. '
+          'Be precise — this summary will be prepended to every future AI query about this document.\n\n'
+          'DOCUMENT SAMPLES:\n$sampleChunks',
+        ),
+      ]);
+      return response.text ?? '';
+    } catch (e) {
+      return ''; // Non-fatal — skeleton is a best-effort enhancement
     }
   }
 }
