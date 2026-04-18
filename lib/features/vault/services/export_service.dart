@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -322,7 +323,7 @@ $messagesHtml
 
   // ─── Tiers 2 & 3: pw.Document fallback ───────────────────────────────────
 
-  static Future<List<int>> _buildPwDocument(
+  static Future<Uint8List> _buildPwDocument(
     String title,
     String dateStr,
     List<ChatMessage> messages, {
@@ -456,6 +457,6 @@ $messagesHtml
       ),
     );
 
-    return pdf.save();
+    return Uint8List.fromList(await pdf.save());
   }
 }

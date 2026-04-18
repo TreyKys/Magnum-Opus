@@ -14,6 +14,7 @@ import 'package:markdown/markdown.dart' as m;
 
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/vault/models/chat_message.dart';
 import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
 import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
-import 'package:syncfusion_flutter_pdf/syncfusion_flutter_pdf.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path/path.dart' as p;
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
