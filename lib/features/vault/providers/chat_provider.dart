@@ -93,7 +93,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       final errorMessage = ChatMessage(
         id: _uuid.v4(),
         documentId: arg,
-        text: 'Error communicating with intelligence module: $e',
+        text: 'Something went wrong. Please try again.',
         isUser: false,
         timestamp: DateTime.now(),
       );

@@ -26,7 +26,7 @@ class SettingsScreen extends ConsumerWidget {
           // ── AI Intelligence ──────────────────────────────────────────────
           _buildSection(
             context,
-            'AI Intelligence',
+            'Response Depth',
             [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -43,7 +43,7 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Controls how deep and technical the AI responds. Persists across sessions.',
+                      'Controls how deep and technical Magnum responds. Persists across sessions.',
                       style:
                           TextStyle(color: AppTheme.textMuted, fontSize: 12, height: 1.4),
                     ),
@@ -136,10 +136,10 @@ class SettingsScreen extends ConsumerWidget {
                     style: TextStyle(color: AppTheme.textMuted)),
               ),
               const ListTile(
-                title: Text('Intelligence Engine',
+                title: Text('Magnum Engine',
                     style: TextStyle(color: Colors.white)),
                 subtitle: Text(
-                    'Gemini 2.5 Flash · Local RAG · SQLite v4',
+                    'Proprietary · Local-first · v4',
                     style: TextStyle(color: AppTheme.textMuted)),
               ),
               const ListTile(

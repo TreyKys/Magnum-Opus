@@ -286,7 +286,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             ),
             const SizedBox(height: 8),
             const Text(
-              'Three layers that keep the AI grounded in your documents.',
+              'Three layers that keep Magnum grounded in your documents.',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
             const SizedBox(height: 32),
@@ -294,7 +294,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               step: '01',
               title: 'Global Skeleton',
               description:
-                  'A 200-word macro-summary is generated on ingest and pinned to every query. The AI never loses the overarching context.',
+                  'A 200-word macro-summary is generated on ingest and pinned to every query. Magnum never loses the overarching context.',
               icon: Icons.account_tree_outlined,
               color: AppTheme.accentBlue,
             ),
@@ -312,7 +312,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               step: '03',
               title: 'Traceback Citations',
               description:
-                  'Every AI response ends with exact source references — [Source: Page 42] — so you can verify every claim.',
+                  'Every response ends with exact source references — [Source: Page 42] — so you can verify every claim.',
               icon: Icons.verified_outlined,
               color: const Color(0xFF16A34A),
             ),
@@ -344,7 +344,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             ),
             const SizedBox(height: 8),
             const Text(
-              'Slide to control how deep the AI goes. It resets nothing — it simply changes how the AI speaks.',
+              'Slide to control how deep Magnum goes. It resets nothing — it simply changes how Magnum responds.',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
             const SizedBox(height: 32),
@@ -392,7 +392,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             _ProFeatureRow(
               icon: Icons.mic_outlined,
               title: 'Audio Transcription',
-              subtitle: 'Upload lectures — AI transcribes & indexes.',
+              subtitle: 'Upload lectures — auto-transcribed & indexed.',
             ),
             _ProFeatureRow(
               icon: Icons.language,

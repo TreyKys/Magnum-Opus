@@ -151,7 +151,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     'All data stays on your device. Zero external servers. Complete privacy.',
     'Magnum Opus leverages Isolate spawning to handle massive documents efficiently.',
     'Our custom SQLite schema ensures instant recovery even if interrupted.',
-    'The Complexity Dial scales AI depth from ELI5 to full PhD — try it!',
+    'The Complexity Dial scales from ELI5 to expert-level — try it!',
     'Magnum Opus dynamically chunks document data to prevent memory leaks.',
     'Your reading progress and recent documents are intelligently tracked.',
     'Background processes automatically retry if the app is unexpectedly closed.',

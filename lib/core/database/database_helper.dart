@@ -183,6 +183,18 @@ CREATE TABLE chat_history (
         where: 'document_id = ?', whereArgs: [documentId]);
   }
 
+  /// Returns all chunks for a document in page order — used by the document viewer.
+  Future<List<Map<String, dynamic>>> getAllDocumentChunks(String documentId) async {
+    final db = await database;
+    return db.query(
+      'document_chunks',
+      columns: ['page_number', 'extracted_text'],
+      where: 'document_id = ?',
+      whereArgs: [documentId],
+      orderBy: 'page_number ASC',
+    );
+  }
+
   /// Top-15 Semantic Fetch with context overlap.
   ///
   /// 1. Score every chunk by keyword hit count.
