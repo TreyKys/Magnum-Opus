@@ -72,7 +72,15 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
     final energy = ref.read(energyProvider);
     if (energy <= 0) return;
     ref.read(energyProvider.notifier).consumeEnergy();
-    ref.read(sessionMessagesProvider(widget.sessionId).notifier).sendMessage(text);
+    final session = ref
+        .read(standaloneChatProvider)
+        .sessions
+        .where((s) => s.id == widget.sessionId)
+        .firstOrNull;
+    ref.read(sessionMessagesProvider(widget.sessionId).notifier).sendMessage(
+          text,
+          attachedDocumentId: session?.attachedDocumentId,
+        );
     _inputController.clear();
     Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
   }
