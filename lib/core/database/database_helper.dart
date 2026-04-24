@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -55,14 +55,36 @@ CREATE TABLE chat_history (
 ''');
     }
     if (oldVersion < 4) {
-      // Add file_type column (default 'pdf' for existing documents)
       await db.execute(
         "ALTER TABLE documents ADD COLUMN file_type TEXT NOT NULL DEFAULT 'pdf'",
       );
-      // Add skeleton column (nullable — generated after extraction)
       await db.execute(
         "ALTER TABLE documents ADD COLUMN skeleton TEXT",
       );
+    }
+    if (oldVersion < 5) {
+      await db.execute('''
+CREATE TABLE standalone_sessions (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_message_at TEXT,
+  is_pinned INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  attached_document_id TEXT,
+  FOREIGN KEY (attached_document_id) REFERENCES documents(id) ON DELETE SET NULL
+)
+''');
+      await db.execute('''
+CREATE TABLE standalone_messages (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  is_user INTEGER NOT NULL,
+  timestamp TEXT NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES standalone_sessions(id) ON DELETE CASCADE
+)
+''');
     }
   }
 
@@ -99,6 +121,30 @@ CREATE TABLE chat_history (
   timestamp TEXT NOT NULL,
   is_pinned INTEGER NOT NULL,
   FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
+)
+''');
+
+    await db.execute('''
+CREATE TABLE standalone_sessions (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_message_at TEXT,
+  is_pinned INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  attached_document_id TEXT,
+  FOREIGN KEY (attached_document_id) REFERENCES documents(id) ON DELETE SET NULL
+)
+''');
+
+    await db.execute('''
+CREATE TABLE standalone_messages (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  is_user INTEGER NOT NULL,
+  timestamp TEXT NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES standalone_sessions(id) ON DELETE CASCADE
 )
 ''');
   }
@@ -315,6 +361,93 @@ CREATE TABLE chat_history (
       where: 'id = ?',
       whereArgs: [messageId],
     );
+  }
+
+  // ─── Standalone Sessions ──────────────────────────────────────────────────
+
+  Future<void> insertStandaloneSession(Map<String, dynamic> session) async {
+    final db = await instance.database;
+    await db.insert('standalone_sessions', session,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Returns non-archived sessions: pinned first, then by last_message_at DESC.
+  Future<List<Map<String, dynamic>>> getAllStandaloneSessions() async {
+    final db = await instance.database;
+    return db.rawQuery('''
+      SELECT s.*, d.title as attached_document_title
+      FROM standalone_sessions s
+      LEFT JOIN documents d ON s.attached_document_id = d.id
+      WHERE s.is_archived = 0
+      ORDER BY s.is_pinned DESC, COALESCE(s.last_message_at, s.created_at) DESC
+    ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getArchivedSessions() async {
+    final db = await instance.database;
+    return db.rawQuery('''
+      SELECT s.*, d.title as attached_document_title
+      FROM standalone_sessions s
+      LEFT JOIN documents d ON s.attached_document_id = d.id
+      WHERE s.is_archived = 1
+      ORDER BY COALESCE(s.last_message_at, s.created_at) DESC
+    ''');
+  }
+
+  Future<int> countActiveSessions() async {
+    final db = await instance.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM standalone_sessions WHERE is_archived = 0',
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<void> updateStandaloneSession(
+      String id, Map<String, dynamic> fields) async {
+    final db = await instance.database;
+    await db.update('standalone_sessions', fields,
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteStandaloneSession(String id) async {
+    final db = await instance.database;
+    await db.delete('standalone_sessions', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ─── Standalone Messages ──────────────────────────────────────────────────
+
+  Future<void> insertStandaloneMessage(Map<String, dynamic> message) async {
+    final db = await instance.database;
+    await db.insert('standalone_messages', message,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getSessionMessages(
+      String sessionId) async {
+    final db = await instance.database;
+    return db.query(
+      'standalone_messages',
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+      orderBy: 'timestamp ASC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getSessionPreviewMessages(
+      String sessionId) async {
+    final db = await instance.database;
+    return db.rawQuery('''
+      SELECT * FROM standalone_messages
+      WHERE session_id = ?
+      ORDER BY timestamp DESC
+      LIMIT 2
+    ''', [sessionId]);
+  }
+
+  Future<void> clearSessionMessages(String sessionId) async {
+    final db = await instance.database;
+    await db.delete('standalone_messages',
+        where: 'session_id = ?', whereArgs: [sessionId]);
   }
 
   Future<void> close() async {

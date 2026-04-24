@@ -1,99 +1,111 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
+
+import 'package:archive/archive.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:markdown_widget/markdown_widget.dart';
-import 'package:markdown_widget/config/configs.dart';
-import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:markdown/markdown.dart' as m;
+import 'package:webview_flutter/webview_flutter.dart';
 
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
-import 'package:magnum_opus/features/vault/models/document_model.dart';
-import 'package:magnum_opus/features/vault/models/chat_message.dart';
-import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
-import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
-import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
-import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
-import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
+import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
 
-// ─── LaTeX rendering (identical to pdf_viewer_screen) ────────────────────────
+// ─── HTML templates (raw strings avoid escaping issues) ───────────────────────
 
-class _LatexSyntax extends m.InlineSyntax {
-  _LatexSyntax() : super(r'\$(.+?)\$');
-  @override
-  bool onMatch(m.InlineParser parser, Match match) {
-    final latex = match[1];
-    if (latex != null) {
-      parser.addNode(m.Element.text('latex', latex));
-      return true;
+const _kDocxTemplate = r'''<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:Georgia,serif;padding:20px 22px;line-height:1.75;color:#E2E2E2;background:#0A0A0A;margin:0}
+h1,h2,h3,h4{font-family:-apple-system,sans-serif;color:#FFF;margin:1.2em 0 .5em}
+h1{font-size:1.4em}h2{font-size:1.2em}h3{font-size:1.05em}
+p{margin:0 0 .9em}strong,b{color:#FFF}
+table{width:100%;border-collapse:collapse;margin:1em 0}
+td,th{border:1px solid #2A2A2A;padding:7px 10px;text-align:left;font-size:.9em}
+th{background:#1A1A1A;color:#FFF;font-weight:600}
+ul,ol{padding-left:1.5em;margin:.4em 0 .9em}li{margin:.25em 0}
+a{color:#4FC3F7}img{max-width:100%;height:auto}
+blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AAA}
+</style>
+<script>__MAMMOTH__</script>
+</head><body>
+<div id="c"><p style="color:#555">Rendering document...</p></div>
+<script>
+(function(){
+var b="__B64__",bin=atob(b),arr=new Uint8Array(bin.length);
+for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+mammoth.convertToHtml({arrayBuffer:arr.buffer})
+  .then(function(r){document.getElementById("c").innerHTML=r.value||'<p style="color:#666">No text content.</p>';})
+  .catch(function(e){document.getElementById("c").innerHTML='<p style="color:#e57373">Error: '+e+'</p>';});
+})();
+</script></body></html>''';
+
+const _kPptxTemplate = r'''<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:#0A0A0A;font-family:-apple-system,sans-serif}
+.slide{background:#131325;border-radius:12px;padding:22px 24px;margin-bottom:14px;border:1px solid #2A2A4A;min-height:160px}
+.sn{color:#4FC3F7;font-size:9px;font-weight:700;letter-spacing:1.2px;margin-bottom:10px}
+.st{color:#FFF;font-size:18px;font-weight:700;margin-bottom:12px;line-height:1.3}
+.sb p{color:#C8CDD5;font-size:13.5px;line-height:1.65;margin:0 0 5px}
+.se{color:#444;font-style:italic;font-size:12px}
+#status{color:#4FC3F7;font-size:13px;padding:30px;text-align:center}
+</style>
+<script>__JSZIP__</script>
+</head><body>
+<div id="status">Parsing presentation...</div>
+<div id="slides"></div>
+<script>
+(function(){
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function parse(xml,idx,tot){
+  var doc=(new DOMParser()).parseFromString(xml,"text/xml");
+  var sps=doc.getElementsByTagName("p:sp"),title="",body=[];
+  for(var i=0;i<sps.length;i++){
+    var ph=sps[i].getElementsByTagName("p:ph")[0];
+    var type=ph?ph.getAttribute("type"):"";
+    var txb=sps[i].getElementsByTagName("p:txBody")[0];
+    if(!txb)continue;
+    var paras=txb.getElementsByTagName("a:p"),lines=[];
+    for(var j=0;j<paras.length;j++){
+      var runs=paras[j].getElementsByTagName("a:r"),line="";
+      for(var k=0;k<runs.length;k++){var t=runs[k].getElementsByTagName("a:t")[0];if(t)line+=t.textContent;}
+      if(line.trim())lines.push(line.trim());
     }
-    return false;
+    if(type==="title"||type==="ctrTitle")title=lines.join(" ");
+    else body=body.concat(lines);
   }
+  return{idx:idx,tot:tot,title:title,body:body};
 }
-
-class _LatexBlockSyntax extends m.BlockSyntax {
-  @override
-  RegExp get pattern => RegExp(r'^\$\$(.*?)\$\$$', multiLine: true);
-  @override
-  m.Node parse(m.BlockParser parser) {
-    final match = pattern.firstMatch(parser.current.content);
-    final latex = match?[1] ?? '';
-    parser.advance();
-    return m.Element.text('latexBlock', latex);
-  }
-}
-
-class _LatexNode extends SpanNode {
-  final Map<String, String> attributes;
-  final String textContent;
-  _LatexNode(this.attributes, this.textContent);
-  @override
-  InlineSpan build() => WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Math.tex(textContent,
-            textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
-      );
-}
-
-class _LatexBlockNode extends SpanNode {
-  final Map<String, String> attributes;
-  final String textContent;
-  _LatexBlockNode(this.attributes, this.textContent);
-  @override
-  InlineSpan build() => WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Math.tex(textContent,
-              textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
-        ),
-      );
-}
-
-class _LatexGenerator extends SpanNodeGeneratorWithTag {
-  _LatexGenerator()
-      : super(
-            tag: 'latex',
-            generator: (e, config, visitor) =>
-                _LatexNode(e.attributes, e.textContent));
-  @override
-  SpanNode build() => _LatexNode(const {}, '');
-}
-
-class _LatexBlockGenerator extends SpanNodeGeneratorWithTag {
-  _LatexBlockGenerator()
-      : super(
-            tag: 'latexBlock',
-            generator: (e, config, visitor) =>
-                _LatexBlockNode(e.attributes, e.textContent));
-  @override
-  SpanNode build() => _LatexBlockNode(const {}, '');
-}
+var raw=atob("__B64__"),bytes=new Uint8Array(raw.length);
+for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+JSZip.loadAsync(bytes).then(function(zip){
+  var keys=Object.keys(zip.files).filter(function(f){
+    return f.indexOf("ppt/slides/slide")==0&&f.slice(-4)===".xml"&&f.indexOf("/_rels/")<0;
+  }).sort(function(a,b){
+    return parseInt(a.replace(/[^0-9]/g,""))-parseInt(b.replace(/[^0-9]/g,""));
+  });
+  if(!keys.length){document.getElementById("status").textContent="No slides found.";return;}
+  document.getElementById("status").remove();
+  var con=document.getElementById("slides");
+  return Promise.all(keys.map(function(f,i){
+    return zip.files[f].async("string").then(function(x){return parse(x,i+1,keys.length);});
+  })).then(function(slides){
+    slides.forEach(function(s){
+      var bh=s.body.length?'<div class="sb">'+s.body.map(function(l){return'<p>'+esc(l)+'</p>';}).join("")+'</div>':(!s.title?'<div class="se">(No text on this slide)</div>':'');
+      con.insertAdjacentHTML("beforeend",'<div class="slide"><div class="sn">SLIDE '+s.idx+' / '+s.tot+'</div>'+(s.title?'<div class="st">'+esc(s.title)+'</div>':'')+bh+'</div>');
+    });
+  });
+}).catch(function(e){document.getElementById("slides").innerHTML='<p style="color:#e57373;padding:20px">Error: '+e+'</p>';});
+})();
+</script></body></html>''';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -107,47 +119,28 @@ class DocumentViewScreen extends ConsumerStatefulWidget {
 
 class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
     with TickerProviderStateMixin {
-  // ── Content state ──────────────────────────────────────────────────────────
-  List<Map<String, dynamic>> _chunks = [];
-  bool _isContentLoaded = false;
-  bool _showLoadingScreen = true;
+  bool _isLoading = true;
+  String _loadingMessage = 'Opening document...';
 
-  // ── Slide viewer ───────────────────────────────────────────────────────────
-  int _currentSlide = 0;
-  final PageController _slideController = PageController();
+  WebViewController? _webViewController;
+  String _textContent = '';
+  List<String> _tableHeaders = [];
+  List<List<String>> _tableRows = [];
 
-  // ── Chat / intel sheet ─────────────────────────────────────────────────────
-  final TextEditingController _chatController = TextEditingController();
-  final ScrollController _chatScrollController = ScrollController();
-  final GlobalKey _contentKey = GlobalKey();
-
-  // ── Animations ─────────────────────────────────────────────────────────────
   late AnimationController _hoverController;
   late Animation<double> _hoverAnimation;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-
   String _selectedTip = '';
 
-  // ── Ads ────────────────────────────────────────────────────────────────────
-  RewardedAd? _rewardedAd;
-  bool _isAdLoaded = false;
-
-  static const List<String> _tips = [
+  static const _tips = [
     'Use active recall and spaced repetition to remember document content.',
-    'Highlight sparingly — it helps important text stand out more effectively.',
     'Read the conclusion first to understand the author\'s destination.',
     'Skim headings before reading to build a mental map of the text.',
     'Summarize each section in your own words to improve comprehension.',
     'Take breaks every 25 minutes to maintain peak cognitive focus.',
-    'Look up unfamiliar words immediately to avoid losing context.',
-    'Discussing what you read with others solidifies your understanding.',
-    'Ask questions of the text as you read to stay actively engaged.',
     'Magnum Opus uses Isolate spawning to handle massive documents efficiently.',
-    'The vault never drops a frame, keeping your UI 100% responsive.',
     'All data stays on your device. Zero external servers. Complete privacy.',
-    'Our custom SQLite schema ensures instant recovery even if interrupted.',
-    'Background processes automatically retry if the app is unexpectedly closed.',
     'The Complexity Dial scales from ELI5 to expert-level — try it!',
   ];
 
@@ -166,438 +159,225 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
-        .animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
+    );
     _fadeController.forward();
-    _loadChunks();
-  }
-
-  Future<void> _loadChunks() async {
-    final chunks =
-        await DatabaseHelper.instance.getAllDocumentChunks(widget.document.id);
-    if (!mounted) return;
-    setState(() {
-      _chunks = chunks;
-      _isContentLoaded = true;
-      if (chunks.isNotEmpty) {
-        _showLoadingScreen = false;
-        DatabaseHelper.instance
-            .updateDocumentLastAccessed(widget.document.id);
-      }
-    });
-  }
-
-  Future<Uint8List?> _captureContentScreen() async {
-    try {
-      final boundary = _contentKey.currentContext?.findRenderObject()
-          as RenderRepaintBoundary?;
-      if (boundary == null) return null;
-      final image = await boundary.toImage(pixelRatio: 2.0);
-      final byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  void _loadRewardedAd() {
-    const adUnitId = 'ca-app-pub-3940256099942544/5224354917';
-    RewardedAd.load(
-      adUnitId: adUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardedAd = ad;
-          _isAdLoaded = true;
-          _rewardedAd?.fullScreenContentCallback =
-              FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (ad) {
-              ad.dispose();
-              _isAdLoaded = false;
-              _loadRewardedAd();
-            },
-            onAdFailedToShowFullScreenContent: (ad, err) {
-              ad.dispose();
-              _isAdLoaded = false;
-              _loadRewardedAd();
-            },
-          );
-        },
-        onAdFailedToLoad: (_) {
-          _isAdLoaded = false;
-        },
-      ),
-    );
-  }
-
-  // ── Intel sheet ────────────────────────────────────────────────────────────
-
-  void _showIntelSheet() {
-    if (!_isAdLoaded) _loadRewardedAd();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return Consumer(
-          builder: (sheetContext, ref, _) {
-            final chatMessages =
-                ref.watch(chatProvider(widget.document.id));
-            final chatNotifier =
-                ref.read(chatProvider(widget.document.id).notifier);
-            final energy = ref.watch(energyProvider);
-            final energyNotifier = ref.read(energyProvider.notifier);
-
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_chatScrollController.hasClients) {
-                _chatScrollController.animateTo(
-                  _chatScrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              }
-            });
-
-            Future<void> handleSend(String value) async {
-              if (value.trim().isEmpty) return;
-              if (energy <= 0) {
-                showDialog(
-                  context: sheetContext,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: AppTheme.surface,
-                    title: const Text('Out of Energy',
-                        style:
-                            TextStyle(color: AppTheme.accentBlueLight)),
-                    content: const Text(
-                        'Watch an ad to recharge and continue.',
-                        style: TextStyle(color: Colors.white70)),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('CANCEL',
-                            style: TextStyle(color: Colors.white54)),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          if (_isAdLoaded && _rewardedAd != null) {
-                            _rewardedAd?.show(
-                              onUserEarnedReward: (_, __) =>
-                                  energyNotifier.refillEnergy(),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Ad loading — try again in a moment.')),
-                            );
-                            _loadRewardedAd();
-                          }
-                        },
-                        child: const Text('WATCH AD',
-                            style: TextStyle(
-                                color: AppTheme.accentBlueLight,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                );
-                return;
-              }
-              final imageBytes = await _captureContentScreen();
-              await energyNotifier.consumeEnergy();
-              chatNotifier.sendMessage(value, imageBytes: imageBytes);
-              _chatController.clear();
-            }
-
-            return FractionallySizedBox(
-              heightFactor: 0.88,
-              child: Padding(
-                padding: EdgeInsets.only(
-                    bottom:
-                        MediaQuery.of(sheetContext).viewInsets.bottom),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    // Header row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(children: [
-                                const Icon(Icons.bolt,
-                                    color: AppTheme.accentBlueLight,
-                                    size: 18),
-                                const SizedBox(width: 4),
-                                Text('$energy Energy',
-                                    style: const TextStyle(
-                                      color: AppTheme.accentBlueLight,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    )),
-                              ]),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline,
-                                    color: Colors.white54),
-                                onPressed: chatNotifier.clearChat,
-                                tooltip: 'Clear',
-                              ),
-                            ],
-                          ),
-                          const ComplexityMiniDial(),
-                        ],
-                      ),
-                    ),
-                    // Compile Report bar
-                    if (chatMessages.isNotEmpty)
-                      _CompileReportBar(
-                        title: widget.document.title,
-                        messages: chatMessages,
-                        sheetContext: sheetContext,
-                      ),
-                    const Divider(color: AppTheme.border, height: 1),
-                    // Messages
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _chatScrollController,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        itemCount: chatMessages.length +
-                            (chatNotifier.isThinking ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == chatMessages.length &&
-                              chatNotifier.isThinking) {
-                            return Align(
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                margin:
-                                    const EdgeInsets.only(bottom: 16),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surface,
-                                  borderRadius:
-                                      BorderRadius.circular(16).copyWith(
-                                          bottomLeft: Radius.zero),
-                                ),
-                                child: const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.accentBlue,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          return _buildMessageBubble(
-                              chatMessages[index], chatNotifier);
-                        },
-                      ),
-                    ),
-                    // Input bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.surface,
-                        border: Border(
-                            top: BorderSide(
-                                color: AppTheme.border, width: 1)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _chatController,
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: handleSend,
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Ask about this document...',
-                                hintStyle: const TextStyle(
-                                    color: Colors.white38),
-                                filled: true,
-                                fillColor: AppTheme.background,
-                                contentPadding:
-                                    const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 12),
-                                border: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(24),
-                                  borderSide: const BorderSide(
-                                      color: AppTheme.border),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(24),
-                                  borderSide: const BorderSide(
-                                      color: AppTheme.border),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(24),
-                                  borderSide: const BorderSide(
-                                      color: AppTheme.accentBlue),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.send,
-                                color: AppTheme.accentBlue),
-                            onPressed: () =>
-                                handleSend(_chatController.text),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildMessageBubble(
-      ChatMessage msg, ChatNotifier chatNotifier) {
-    return Align(
-      alignment:
-          msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment:
-            msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!msg.isUser)
-            IconButton(
-              icon: Icon(
-                msg.isPinned
-                    ? Icons.push_pin
-                    : Icons.push_pin_outlined,
-                color: msg.isPinned
-                    ? AppTheme.accentBlueLight
-                    : Colors.white38,
-                size: 18,
-              ),
-              onPressed: () =>
-                  chatNotifier.togglePin(msg.id, !msg.isPinned),
-              constraints:
-                  const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: EdgeInsets.zero,
-            ),
-          Flexible(
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: msg.isUser
-                    ? AppTheme.accentBlue
-                    : AppTheme.surface,
-                borderRadius: BorderRadius.circular(16).copyWith(
-                  bottomRight: msg.isUser
-                      ? Radius.zero
-                      : const Radius.circular(16),
-                  bottomLeft: !msg.isUser
-                      ? Radius.zero
-                      : const Radius.circular(16),
-                ),
-              ),
-              child: msg.isUser
-                  ? Text(msg.text,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 15))
-                  : MarkdownWidget(
-                      data: msg.text,
-                      shrinkWrap: true,
-                      physics:
-                          const NeverScrollableScrollPhysics(),
-                      config: MarkdownConfig.darkConfig,
-                      markdownGenerator: MarkdownGenerator(
-                        generators: [
-                          _LatexGenerator(),
-                          _LatexBlockGenerator()
-                        ],
-                        inlineSyntaxList: [_LatexSyntax()],
-                        blockSyntaxList: [_LatexBlockSyntax()],
-                      ),
-                    ),
-            ),
-          ),
-          if (msg.isUser)
-            IconButton(
-              icon: Icon(
-                msg.isPinned
-                    ? Icons.push_pin
-                    : Icons.push_pin_outlined,
-                color: msg.isPinned
-                    ? AppTheme.accentBlueLight
-                    : Colors.white54,
-                size: 18,
-              ),
-              onPressed: () =>
-                  chatNotifier.togglePin(msg.id, !msg.isPinned),
-              constraints:
-                  const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: EdgeInsets.zero,
-            ),
-        ],
-      ),
-    );
+    _loadContent();
   }
 
   @override
   void dispose() {
-    _chatController.dispose();
-    _chatScrollController.dispose();
-    _slideController.dispose();
     _hoverController.dispose();
     _fadeController.dispose();
-    _rewardedAd?.dispose();
     super.dispose();
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
+  Future<void> _loadContent() async {
+    final ft = widget.document.fileType;
+    switch (ft) {
+      case 'docx':
+        _loadingMessage = 'Rendering Word document...';
+        await _initDocxViewer();
+      case 'pptx':
+        _loadingMessage = 'Rendering presentation...';
+        await _initPptxViewer();
+      case 'epub':
+        _loadingMessage = 'Opening e-book...';
+        await _initEpubViewer();
+      case 'xlsx':
+        _loadingMessage = 'Reading spreadsheet...';
+        await _loadXlsx();
+      case 'csv':
+        _loadingMessage = 'Parsing CSV...';
+        await _loadCsv();
+      case 'txt':
+        _loadingMessage = 'Loading text...';
+        await _loadTxt();
+      default:
+        _loadingMessage = 'Loading...';
+        await _loadChunks();
+    }
+    DatabaseHelper.instance.updateDocumentLastAccessed(widget.document.id);
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // ── DOCX ─────────────────────────────────────────────────────────────────────
+
+  Future<void> _initDocxViewer() async {
+    final js = await rootBundle.loadString('assets/js/mammoth.min.js');
+    final bytes = await File(widget.document.filePath).readAsBytes();
+    final b64 = base64Encode(bytes);
+    final html = _kDocxTemplate
+        .replaceFirst('__MAMMOTH__', js)
+        .replaceFirst('__B64__', b64);
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF0A0A0A))
+      ..loadHtmlString(html);
+  }
+
+  // ── PPTX ─────────────────────────────────────────────────────────────────────
+
+  Future<void> _initPptxViewer() async {
+    final js = await rootBundle.loadString('assets/js/jszip.min.js');
+    final bytes = await File(widget.document.filePath).readAsBytes();
+    final b64 = base64Encode(bytes);
+    final html = _kPptxTemplate
+        .replaceFirst('__JSZIP__', js)
+        .replaceFirst('__B64__', b64);
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF0A0A0A))
+      ..loadHtmlString(html);
+  }
+
+  // ── EPUB ─────────────────────────────────────────────────────────────────────
+
+  Future<void> _initEpubViewer() async {
+    try {
+      final bytes = await File(widget.document.filePath).readAsBytes();
+      final html = _buildEpubHtml(bytes);
+      _webViewController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(const Color(0xFF0A0A0A))
+        ..loadHtmlString(html);
+    } catch (_) {
+      await _loadChunks();
+    }
+  }
+
+  String _buildEpubHtml(List<int> bytes) {
+    final archive = ZipDecoder().decodeBytes(bytes);
+
+    final containerFile = archive.findFile('META-INF/container.xml');
+    if (containerFile == null) throw Exception('Not a valid EPUB');
+    final containerStr = utf8.decode(containerFile.content as List<int>, allowMalformed: true);
+    final opfMatch = RegExp(r'full-path="([^"]+)"').firstMatch(containerStr);
+    if (opfMatch == null) throw Exception('No OPF found');
+    final opfPath = opfMatch.group(1)!;
+    final opfDir = opfPath.contains('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
+
+    final opfFile = archive.findFile(opfPath);
+    if (opfFile == null) throw Exception('OPF missing');
+    final opfStr = utf8.decode(opfFile.content as List<int>, allowMalformed: true);
+
+    final manifest = <String, String>{};
+    for (final m in RegExp(r'<item[^>]+id="([^"]+)"[^>]+href="([^"]+)"', caseSensitive: false).allMatches(opfStr)) {
+      manifest[m.group(1)!] = m.group(2)!;
+    }
+
+    final chapters = <String>[];
+    for (final m in RegExp(r'<itemref[^>]+idref="([^"]+)"', caseSensitive: false).allMatches(opfStr)) {
+      final href = manifest[m.group(1)!];
+      if (href == null) continue;
+      final file = archive.findFile(opfDir + href);
+      if (file == null) continue;
+      final src = utf8.decode(file.content as List<int>, allowMalformed: true);
+      final body = RegExp(r'<body[^>]*>([\s\S]*?)</body>', caseSensitive: false).firstMatch(src)?.group(1) ?? src;
+      chapters.add(body);
+    }
+
+    final combined = chapters.isEmpty
+        ? '<p>Could not extract content from this EPUB.</p>'
+        : chapters.join('\n<hr style="border-color:#1A1A1A;margin:2em 0">\n');
+
+    return '''<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;padding:0;background:#0A0A0A;color:#E2E2E2}
+body{font-family:Georgia,serif;padding:20px 22px;line-height:1.8;font-size:16px}
+h1,h2,h3,h4,h5,h6{font-family:-apple-system,sans-serif;color:#FFF;margin:1.3em 0 .5em}
+p{margin:0 0 1em}a{color:#4FC3F7;text-decoration:none}strong,b{color:#FFF}
+img{max-width:100%;height:auto;border-radius:4px;margin:1em 0}
+table{width:100%;border-collapse:collapse;margin:1em 0}
+td,th{border:1px solid #2A2A2A;padding:6px 10px;font-size:.9em}
+th{background:#1A1A1A;color:#FFF;font-weight:600}
+ul,ol{padding-left:1.5em;margin:.5em 0 1em}li{margin:.3em 0}
+blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AAA}
+</style>
+</head><body>$combined</body></html>''';
+  }
+
+  // ── XLSX ─────────────────────────────────────────────────────────────────────
+
+  Future<void> _loadXlsx() async {
+    try {
+      final bytes = await File(widget.document.filePath).readAsBytes();
+      final excel = Excel.decodeBytes(bytes.toList());
+      final sheetName = excel.tables.keys.firstOrNull;
+      if (sheetName == null) return;
+      final sheet = excel.tables[sheetName]!;
+      final headers = <String>[];
+      final rows = <List<String>>[];
+      for (int i = 0; i < sheet.maxRows; i++) {
+        final row = sheet.row(i);
+        final cells = List<String>.generate(
+          sheet.maxCols,
+          (j) => j < row.length ? (row[j]?.value?.toString() ?? '') : '',
+        );
+        if (cells.every((c) => c.isEmpty)) continue;
+        if (headers.isEmpty) {
+          headers.addAll(cells);
+        } else {
+          rows.add(cells);
+        }
+      }
+      _tableHeaders = headers.isEmpty ? ['Column 1'] : headers;
+      _tableRows = rows;
+    } catch (_) {}
+  }
+
+  // ── CSV ──────────────────────────────────────────────────────────────────────
+
+  Future<void> _loadCsv() async {
+    try {
+      final text = await File(widget.document.filePath).readAsString();
+      final lines = text.split('\n').where((l) => l.trim().isNotEmpty).toList();
+      final headers = <String>[];
+      final rows = <List<String>>[];
+      for (int i = 0; i < lines.length; i++) {
+        final cells = _parseCsvLine(lines[i]);
+        if (i == 0) {
+          headers.addAll(cells);
+        } else {
+          rows.add(_padRow(cells, headers.length));
+        }
+      }
+      _tableHeaders = headers.isEmpty ? ['Column 1'] : headers;
+      _tableRows = rows;
+    } catch (_) {}
+  }
+
+  // ── TXT ──────────────────────────────────────────────────────────────────────
+
+  Future<void> _loadTxt() async {
+    try {
+      _textContent = await File(widget.document.filePath).readAsString();
+    } catch (_) {}
+  }
+
+  // ── Audio / URL (SQLite chunks) ───────────────────────────────────────────────
+
+  Future<void> _loadChunks() async {
+    final chunks = await DatabaseHelper.instance.getAllDocumentChunks(widget.document.id);
+    _textContent = chunks.map((c) => c['extracted_text'] as String).join('\n\n');
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final vaultState = ref.watch(vaultProvider);
-    final isIndexing =
-        vaultState.indexingDocumentIds.contains(widget.document.id);
+    final isIndexing = vaultState.indexingDocumentIds.contains(widget.document.id);
 
-    // When indexing finishes, reload chunks once.
     ref.listen<VaultState>(vaultProvider, (prev, next) {
-      final was = prev?.indexingDocumentIds
-              .contains(widget.document.id) ??
-          false;
-      final now =
-          next.indexingDocumentIds.contains(widget.document.id);
-      if (was && !now && _chunks.isEmpty) _loadChunks();
+      final was = prev?.indexingDocumentIds.contains(widget.document.id) ?? false;
+      final now = next.indexingDocumentIds.contains(widget.document.id);
+      if (was && !now && _textContent.isEmpty && _webViewController == null) {
+        _loadContent();
+      }
     });
 
     final typeColor = _colorForType(widget.document.fileType);
@@ -605,93 +385,72 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: _buildAppBar(typeColor),
+      floatingActionButton: (!_isLoading && !isIndexing)
+          ? FloatingActionButton.extended(
+              heroTag: 'chat_fab_doc',
+              backgroundColor: AppTheme.accentBlue,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.chat_bubble_outline, size: 20),
+              label: const Text('Chat', style: TextStyle(fontWeight: FontWeight.w700)),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DocumentChatScreen(document: widget.document),
+                ),
+              ),
+            )
+          : null,
       body: Stack(
         children: [
-          // ── Main content ───────────────────────────────────────────
-          RepaintBoundary(
-            key: _contentKey,
-            child: _isContentLoaded && _chunks.isNotEmpty
-                ? _buildContent()
-                : const SizedBox.shrink(),
-          ),
-
-          // ── Intel FAB ──────────────────────────────────────────────
-          if (!isIndexing && !_showLoadingScreen)
-            Positioned(
-              bottom: 28,
-              right: 20,
-              child: FloatingActionButton(
-                heroTag: 'intel_fab_doc',
-                backgroundColor: AppTheme.accentBlue,
-                foregroundColor: Colors.white,
-                elevation: 6,
-                onPressed: _showIntelSheet,
-                child: const Icon(Icons.auto_awesome, size: 22),
-              ),
-            ),
-
-          // ── Loading overlay ────────────────────────────────────────
-          if (_showLoadingScreen || isIndexing)
-            AnimatedOpacity(
-              opacity: (_showLoadingScreen || isIndexing) ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 600),
-              child: Container(
-                color: AppTheme.background,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AnimatedBuilder(
-                        animation: _hoverAnimation,
-                        builder: (_, child) => Transform.translate(
-                          offset: Offset(0, _hoverAnimation.value),
-                          child: child,
-                        ),
-                        child: Icon(
-                          _iconForType(widget.document.fileType),
-                          size: 80,
-                          color: typeColor,
-                        ),
+          if (!_isLoading && !isIndexing) _buildContent(),
+          if (_isLoading || isIndexing)
+            Container(
+              color: AppTheme.background,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _hoverAnimation,
+                      builder: (_, child) => Transform.translate(
+                        offset: Offset(0, _hoverAnimation.value),
+                        child: child,
                       ),
-                      const SizedBox(height: 28),
-                      Text(
-                        isIndexing
-                            ? widget.document.fileType == 'audio'
-                                ? 'Transcribing audio...'
-                                : widget.document.fileType == 'url'
-                                    ? 'Scraping content...'
-                                    : 'Reading document...'
-                            : 'Loading...',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      child: Icon(
+                        _iconForType(widget.document.fileType),
+                        size: 80,
+                        color: typeColor,
                       ),
-                      const SizedBox(height: 40),
-                      if (settings.showReadingTips)
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 40),
-                            child: Text(
-                              _selectedTip,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: Colors.white54,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                            ),
+                    ),
+                    const SizedBox(height: 28),
+                    Text(
+                      isIndexing
+                          ? (widget.document.fileType == 'audio'
+                              ? 'Transcribing audio...'
+                              : 'Processing document...')
+                          : _loadingMessage,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 40),
+                    if (settings.showReadingTips)
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: Text(
+                            _selectedTip,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white54,
+                                  fontStyle: FontStyle.italic,
+                                ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -715,34 +474,26 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
             widget.document.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
-          if (_chunks.isNotEmpty)
-            Text(
-              '${_chunks.length} sections · ${widget.document.fileSizeMb.toStringAsFixed(1)} MB',
-              style: const TextStyle(
-                  fontSize: 11, color: AppTheme.textMuted),
-            ),
+          Text(
+            '${widget.document.totalPages} sections · ${widget.document.fileSizeMb.toStringAsFixed(1)} MB',
+            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+          ),
         ],
       ),
       actions: [
         Padding(
-          padding:
-              const EdgeInsets.only(right: 16, top: 10, bottom: 10),
+          padding: const EdgeInsets.only(right: 16, top: 10, bottom: 10),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: typeColor.withOpacity(0.15),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               widget.document.fileType.toUpperCase(),
-              style: TextStyle(
-                  color: typeColor,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700),
+              style: TextStyle(color: typeColor, fontSize: 10, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -750,41 +501,40 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
     );
   }
 
-  // ── Content routing ────────────────────────────────────────────────────────
-
   Widget _buildContent() {
     switch (widget.document.fileType) {
+      case 'docx':
+      case 'pptx':
+      case 'epub':
+        return _webViewController != null
+            ? WebViewWidget(controller: _webViewController!)
+            : _buildEmptyState();
       case 'xlsx':
       case 'csv':
         return _buildTableViewer();
-      case 'pptx':
-        return _buildSlideViewer();
       default:
         return _buildTextReader();
     }
   }
 
-  // ── Text reader (epub, docx, txt, url, audio) ──────────────────────────────
-
   Widget _buildTextReader() {
     final type = widget.document.fileType;
+    if (_textContent.isEmpty) return _buildEmptyState();
     return CustomScrollView(
       slivers: [
-        // Optional type-specific banner
         if (type == 'audio' || type == 'url')
           SliverToBoxAdapter(child: _buildTypeBanner(type)),
         SliverPadding(
-          padding:
-              const EdgeInsets.fromLTRB(20, 16, 20, 100),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final text =
-                    _chunks[index]['extracted_text'] as String;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 22),
-                  child: SelectableText(
-                    text,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          sliver: SliverToBoxAdapter(
+            child: type == 'url'
+                ? MarkdownWidget(
+                    data: _textContent,
+                    shrinkWrap: true,
+                    config: MarkdownConfig.darkConfig,
+                  )
+                : SelectableText(
+                    _textContent,
                     style: const TextStyle(
                       fontSize: 16.5,
                       height: 1.72,
@@ -792,10 +542,6 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
                       letterSpacing: 0.15,
                     ),
                   ),
-                );
-              },
-              childCount: _chunks.length,
-            ),
           ),
         ),
       ],
@@ -815,140 +561,78 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
       ),
       child: Row(
         children: [
-          Icon(isAudio ? Icons.mic_none : Icons.language_outlined,
-              color: color, size: 16),
+          Icon(isAudio ? Icons.mic_none : Icons.language_outlined, color: color, size: 16),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              isAudio
-                  ? 'Auto-transcribed from audio'
-                  : widget.document.filePath.startsWith('http')
-                      ? 'Scraped from ${widget.document.filePath}'
-                      : 'Web content',
-              style: TextStyle(color: color, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+          Text(
+            isAudio ? 'Auto-transcribed from audio' : 'AI-generated web summary',
+            style: TextStyle(color: color, fontSize: 12),
           ),
         ],
       ),
     );
   }
 
-  // ── Table viewer (xlsx, csv) ───────────────────────────────────────────────
-
   Widget _buildTableViewer() {
-    final isCsv = widget.document.fileType == 'csv';
-    final List<String> headers = [];
-    final List<List<String>> rows = [];
-
-    for (final chunk in _chunks) {
-      final text = chunk['extracted_text'] as String;
-      for (final line in text.split('\n')) {
-        if (line.trim().isEmpty) continue;
-        if (!isCsv && line.startsWith('---')) continue;
-
-        final cells = isCsv
-            ? _parseCsvLine(line)
-            : line.split('\t').map((c) => c.trim()).toList();
-
-        if (cells.isEmpty || cells.every((c) => c.isEmpty)) continue;
-
-        if (headers.isEmpty) {
-          headers.addAll(cells);
-        } else {
-          final padded = List<String>.generate(
-            headers.length,
-            (i) => i < cells.length ? cells[i] : '',
-          );
-          rows.add(padded);
-        }
-      }
-    }
-
-    if (headers.isEmpty && rows.isEmpty) return _buildEmptyState();
-
-    final displayHeaders =
-        headers.isNotEmpty ? headers : ['Column 1'];
-    final cappedRows = rows.take(1000).toList();
-
+    if (_tableHeaders.isEmpty) return _buildEmptyState();
+    final cappedRows = _tableRows.take(1000).toList();
     return Column(
       children: [
-        // Info bar
         Container(
           width: double.infinity,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           color: AppTheme.surfaceVariant,
           child: Row(children: [
             Icon(_iconForType(widget.document.fileType),
-                color: _colorForType(widget.document.fileType),
-                size: 15),
+                color: _colorForType(widget.document.fileType), size: 15),
             const SizedBox(width: 8),
             Text(
-              '${cappedRows.length} rows · ${displayHeaders.length} columns'
-              '${rows.length > 1000 ? ' (showing first 1 000)' : ''}',
-              style: const TextStyle(
-                  color: AppTheme.textMuted, fontSize: 12),
+              '${cappedRows.length} rows · ${_tableHeaders.length} columns'
+              '${_tableRows.length > 1000 ? ' (first 1 000)' : ''}',
+              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
           ]),
         ),
-        // Scrollable table
         Expanded(
           child: Scrollbar(
             child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.all(8),
                 child: DataTable(
-                  headingRowColor:
-                      WidgetStateProperty.all(AppTheme.surface),
+                  headingRowColor: WidgetStateProperty.all(AppTheme.surface),
                   dividerThickness: 0.5,
                   horizontalMargin: 14,
                   columnSpacing: 20,
                   headingRowHeight: 40,
                   dataRowMinHeight: 36,
                   dataRowMaxHeight: 56,
-                  columns: displayHeaders
+                  columns: _tableHeaders
                       .map((h) => DataColumn(
                             label: SizedBox(
                               width: 130,
-                              child: Text(
-                                h,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                  rows: cappedRows.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final row = entry.value;
-                    return DataRow(
-                      color: WidgetStateProperty.all(
-                        i.isEven
-                            ? AppTheme.background
-                            : AppTheme.surface
-                                .withOpacity(0.6),
-                      ),
-                      cells: row
-                          .map((cell) => DataCell(SizedBox(
-                                width: 130,
-                                child: Text(
-                                  cell,
+                              child: Text(h,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: AppTheme.textSecondary,
-                                    fontSize: 13,
-                                  ),
-                                ),
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13)),
+                            ),
+                          ))
+                      .toList(),
+                  rows: cappedRows.asMap().entries.map((e) {
+                    return DataRow(
+                      color: WidgetStateProperty.all(
+                        e.key.isEven ? AppTheme.background : AppTheme.surface.withOpacity(0.6),
+                      ),
+                      cells: e.value
+                          .map((cell) => DataCell(SizedBox(
+                                width: 130,
+                                child: Text(cell,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: AppTheme.textSecondary, fontSize: 13)),
                               )))
                           .toList(),
                     );
@@ -958,169 +642,10 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
             ),
           ),
         ),
-        const SizedBox(height: 80), // FAB clearance
+        const SizedBox(height: 80),
       ],
     );
   }
-
-  List<String> _parseCsvLine(String line) {
-    final result = <String>[];
-    final current = StringBuffer();
-    bool inQuotes = false;
-    for (int i = 0; i < line.length; i++) {
-      final ch = line[i];
-      if (ch == '"') {
-        inQuotes = !inQuotes;
-      } else if (ch == ',' && !inQuotes) {
-        result.add(current.toString().trim());
-        current.clear();
-      } else {
-        current.write(ch);
-      }
-    }
-    result.add(current.toString().trim());
-    return result;
-  }
-
-  // ── Slide viewer (pptx) ───────────────────────────────────────────────────
-
-  Widget _buildSlideViewer() {
-    return Column(
-      children: [
-        Expanded(
-          child: PageView.builder(
-            controller: _slideController,
-            itemCount: _chunks.length,
-            onPageChanged: (i) => setState(() => _currentSlide = i),
-            itemBuilder: (context, index) {
-              final text =
-                  _chunks[index]['extracted_text'] as String;
-              final content =
-                  text.replaceFirst(RegExp(r'^Slide \d+:\s*'), '');
-
-              return Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Slide header
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentBlue
-                              .withOpacity(0.12),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(15),
-                            topRight: Radius.circular(15),
-                          ),
-                          border: Border(
-                              bottom: BorderSide(
-                                  color: AppTheme.accentBlue
-                                      .withOpacity(0.25))),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.slideshow_outlined,
-                              color: AppTheme.accentBlueLight,
-                              size: 15),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Slide ${index + 1} / ${_chunks.length}',
-                            style: const TextStyle(
-                              color: AppTheme.accentBlueLight,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ]),
-                      ),
-                      // Slide content
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(20),
-                          child: SelectableText(
-                            content,
-                            style: const TextStyle(
-                              color: Color(0xFFE2E2E2),
-                              fontSize: 16,
-                              height: 1.65,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        // Dot indicators
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: _buildDots(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _buildDots() {
-    final n = _chunks.length;
-    if (n <= 1) return [];
-
-    Widget dot(int i) => GestureDetector(
-          onTap: () => _slideController.animateToPage(i,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: i == _currentSlide ? 20 : 8,
-            height: 8,
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            decoration: BoxDecoration(
-              color: i == _currentSlide
-                  ? AppTheme.accentBlue
-                  : AppTheme.border,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        );
-
-    Widget ellipsis() => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: const Text('···',
-              style:
-                  TextStyle(color: AppTheme.textMuted, fontSize: 10)),
-        );
-
-    if (n <= 7) return List.generate(n, dot);
-
-    // Condensed indicators for large decks
-    final widgets = <Widget>[];
-    widgets.add(dot(0));
-    if (_currentSlide > 2) widgets.add(ellipsis());
-    for (int i = (_currentSlide - 1).clamp(1, n - 2);
-        i <= (_currentSlide + 1).clamp(1, n - 2);
-        i++) {
-      widgets.add(dot(i));
-    }
-    if (_currentSlide < n - 3) widgets.add(ellipsis());
-    widgets.add(dot(n - 1));
-    return widgets;
-  }
-
-  // ── Empty state ────────────────────────────────────────────────────────────
 
   Widget _buildEmptyState() {
     return Center(
@@ -1134,21 +659,39 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
             const SizedBox(height: 20),
             const Text('No content extracted yet',
                 style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600)),
+                    color: Colors.white70, fontSize: 17, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             const Text('The document may still be processing.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: AppTheme.textMuted, fontSize: 13)),
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
           ],
         ),
       ),
     );
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  List<String> _parseCsvLine(String line) {
+    final result = <String>[];
+    final buf = StringBuffer();
+    bool inQ = false;
+    for (final ch in line.split('')) {
+      if (ch == '"') {
+        inQ = !inQ;
+      } else if (ch == ',' && !inQ) {
+        result.add(buf.toString().trim());
+        buf.clear();
+      } else {
+        buf.write(ch);
+      }
+    }
+    result.add(buf.toString().trim());
+    return result;
+  }
+
+  List<String> _padRow(List<String> row, int len) {
+    if (row.length >= len) return row.take(len).toList();
+    return [...row, ...List.filled(len - row.length, '')];
+  }
 
   static Color _colorForType(String type) {
     switch (type) {
@@ -1176,126 +719,5 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
       case 'url':   return Icons.language_outlined;
       default:      return Icons.picture_as_pdf_outlined;
     }
-  }
-}
-
-// ─── Compile Report Bar ───────────────────────────────────────────────────────
-
-class _CompileReportBar extends StatefulWidget {
-  final String title;
-  final List<ChatMessage> messages;
-  final BuildContext sheetContext;
-
-  const _CompileReportBar({
-    required this.title,
-    required this.messages,
-    required this.sheetContext,
-  });
-
-  @override
-  State<_CompileReportBar> createState() => _CompileReportBarState();
-}
-
-class _CompileReportBarState extends State<_CompileReportBar> {
-  bool _exporting = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: AppTheme.surfaceVariant,
-      child: Row(
-        children: [
-          const Icon(Icons.picture_as_pdf_outlined,
-              color: AppTheme.textMuted, size: 14),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Compile this thread into a report',
-              style:
-                  TextStyle(color: AppTheme.textMuted, fontSize: 12),
-            ),
-          ),
-          _exporting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppTheme.accentBlueLight,
-                  ),
-                )
-              : TextButton(
-                  onPressed: _handleExport,
-                  child: const Text(
-                    'Export PDF',
-                    style: TextStyle(
-                      color: AppTheme.accentBlueLight,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _handleExport() async {
-    setState(() => _exporting = true);
-    try {
-      await ExportService.exportChatAsPdf(
-        widget.sheetContext,
-        widget.title,
-        widget.messages,
-      );
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
-  }
-}
-
-// ─── Pulsing dot ─────────────────────────────────────────────────────────────
-
-class _PulsingDot extends StatefulWidget {
-  const _PulsingDot();
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, __) => Opacity(
-        opacity: 0.3 + (_ctrl.value * 0.7),
-        child: Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: AppTheme.accentBlueLight,
-            shape: BoxShape.circle,
-          ),
-        ),
-      ),
-    );
   }
 }

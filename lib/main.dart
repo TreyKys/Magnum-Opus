@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
+import 'package:magnum_opus/app/main_scaffold.dart';
 import 'package:magnum_opus/features/settings/presentation/settings_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/vault_screen.dart';
 
@@ -67,7 +68,7 @@ class MyApp extends ConsumerWidget {
       title: 'Magnum Opus',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
-      home: showVault ? const VaultScreen() : const OnboardingScreen(),
+      home: showVault ? const MainScaffold() : const OnboardingScreen(),
       onGenerateRoute: _generateRoute,
     );
   }

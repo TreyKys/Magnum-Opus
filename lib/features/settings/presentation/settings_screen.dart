@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
 
@@ -11,6 +12,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settingsState = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
+    final displayName = ref.watch(onboardingProvider).displayName;
 
     return Scaffold(
       appBar: AppBar(
@@ -61,6 +63,15 @@ class SettingsScreen extends ConsumerWidget {
             context,
             'Preferences',
             [
+              ListTile(
+                title: const Text('Display Name', style: TextStyle(color: Colors.white)),
+                subtitle: Text(
+                  displayName.isEmpty ? 'Not set' : displayName,
+                  style: const TextStyle(color: AppTheme.textMuted),
+                ),
+                trailing: const Icon(Icons.edit_outlined, color: AppTheme.textMuted, size: 18),
+                onTap: () => _showNameDialog(context, ref, displayName),
+              ),
               SwitchListTile(
                 title: const Text('Haptic Feedback',
                     style: TextStyle(color: Colors.white)),
@@ -150,6 +161,55 @@ class SettingsScreen extends ConsumerWidget {
                     style: TextStyle(color: AppTheme.textMuted, height: 1.5)),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNameDialog(BuildContext context, WidgetRef ref, String current) {
+    final ctrl = TextEditingController(text: current);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Display Name',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'First name or nickname',
+            hintStyle: const TextStyle(color: Colors.white38),
+            filled: true,
+            fillColor: AppTheme.background,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppTheme.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppTheme.accentBlue),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentBlue,
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            onPressed: () {
+              ref.read(onboardingProvider.notifier).updateDisplayName(ctrl.text.trim());
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
           ),
         ],
       ),

@@ -4,8 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
-import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
+import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/document_view_screen.dart';
+import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
 
 class VaultScreen extends ConsumerWidget {
   const VaultScreen({super.key});
@@ -40,7 +41,6 @@ class VaultScreen extends ConsumerWidget {
         ),
         body: Column(
           children: [
-            if (documents.isNotEmpty) _buildStatsRibbon(documents),
             Expanded(
               child: TabBarView(
                 children: [
@@ -57,28 +57,6 @@ class VaultScreen extends ConsumerWidget {
           onPressed: () => _showIngestSheet(context, ref),
           child: const Icon(Icons.add),
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatsRibbon(List<DocumentModel> docs) {
-    final totalMb = docs.fold<double>(0, (s, d) => s + d.fileSizeMb);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-      color: AppTheme.surfaceVariant,
-      child: Row(
-        children: [
-          Text(
-            '${docs.length} ${docs.length == 1 ? 'document' : 'documents'}',
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '· ${totalMb.toStringAsFixed(1)} MB indexed',
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
-          ),
-        ],
       ),
     );
   }
@@ -345,6 +323,15 @@ class VaultScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
+                                // Chat
+                                IconButton(
+                                  icon: const Icon(Icons.chat_bubble_outline,
+                                      color: AppTheme.textMuted, size: 18),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    _slideRoute(DocumentChatScreen(document: doc)),
+                                  ),
+                                ),
                                 // Delete
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline,
@@ -373,11 +360,7 @@ class VaultScreen extends ConsumerWidget {
     if (doc.fileType == 'pdf') {
       Navigator.push(
         context,
-        _slideRoute(PdfViewerScreen(
-          id: doc.id,
-          filePath: doc.filePath,
-          title: doc.title,
-        )),
+        _slideRoute(PdfViewerScreen(document: doc)),
       );
     } else {
       Navigator.push(

@@ -5,7 +5,7 @@ import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
-import 'package:magnum_opus/features/vault/presentation/vault_screen.dart';
+import 'package:magnum_opus/app/main_scaffold.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -17,6 +17,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
+  final TextEditingController _nameController = TextEditingController();
   int _currentPage = 0;
   String _selectedPersona = '';
 
@@ -78,6 +79,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   @override
   void dispose() {
     _pageController.dispose();
+    _nameController.dispose();
     _taglineTimer?.cancel();
     for (final c in _pageControllers) {
       c.dispose();
@@ -100,10 +102,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   void _finish() {
     if (_selectedPersona.isEmpty) return;
-    ref.read(onboardingProvider.notifier).complete(_selectedPersona);
+    ref.read(onboardingProvider.notifier).complete(
+          _selectedPersona,
+          displayName: _nameController.text.trim(),
+        );
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const VaultScreen(),
+        pageBuilder: (_, __, ___) => const MainScaffold(),
         transitionsBuilder: (_, animation, __, child) {
           return FadeTransition(opacity: animation, child: child);
         },
@@ -435,7 +440,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     );
   }
 
-  // ─── Page 5: Persona ─────────────────────────────────────────────────────
+  // ─── Page 5: Persona + Name ───────────────────────────────────────────────
 
   Widget _buildPage5() {
     const personas = [
@@ -456,7 +461,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     return _PageWrapper(
       slideAnimation: _pageSlides[4],
       fadeAnimation: _pageFades[4],
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,23 +488,86 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               ),
             ),
             const SizedBox(height: 24),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.2,
-                children: personas
-                    .map((p) => _PersonaCard(
-                          data: p,
-                          selected: _selectedPersona == p.label,
-                          onTap: () => setState(
-                              () => _selectedPersona = p.label),
-                        ))
-                    .toList(),
-              ),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.2,
+              children: personas
+                  .map((p) => _PersonaCard(
+                        data: p,
+                        selected: _selectedPersona == p.label,
+                        onTap: () =>
+                            setState(() => _selectedPersona = p.label),
+                      ))
+                  .toList(),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 28),
+            // Name input
+            Row(
+              children: [
+                const Text(
+                  'What should we call you?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    _nameController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Skip',
+                    style: TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'First name or nickname',
+                hintStyle: const TextStyle(color: AppTheme.textMuted),
+                filled: true,
+                fillColor: AppTheme.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppTheme.accentBlue, width: 2),
+                ),
+              ),
+              textCapitalization: TextCapitalization.words,
+              maxLength: 30,
+              buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                  null,
+            ),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -515,7 +583,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   elevation: 0,
                 ),
                 child: const Text(
-                  'Get Started',
+                  'Get Started →',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
@@ -523,7 +591,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         ),
       ),

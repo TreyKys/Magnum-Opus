@@ -119,6 +119,76 @@ $userQuery
     }
   }
 
+  // ─── General Chat (no document context) ──────────────────────────────────
+
+  Future<String> generalChat({
+    required String query,
+    required List<ChatMessage> history,
+    int complexity = 50,
+    Uint8List? imageBytes,
+  }) async {
+    final complexityBlock = _complexityInstruction(complexity);
+
+    final systemInstruction = '''
+$complexityBlock
+
+You are Magnum Opus — a highly capable AI assistant. You are helpful, articulate, and thorough.
+Respond naturally to the user's message. Format your response with clean spacing, bullet points where appropriate, and bold text for key terms.
+If the user attaches an image, analyse it carefully and answer their question about it.''';
+
+    try {
+      final List<Content> contents = [];
+
+      for (final msg in history) {
+        if (msg.isUser) {
+          contents.add(Content.text(msg.text));
+        } else {
+          contents.add(Content.model([TextPart(msg.text)]));
+        }
+      }
+
+      Content newestContent;
+      if (imageBytes != null) {
+        newestContent = Content.multi([
+          TextPart('$systemInstruction\n\n---\nUSER: $query'),
+          DataPart('image/png', imageBytes),
+        ]);
+      } else {
+        newestContent = Content.text('$systemInstruction\n\n---\nUSER: $query');
+      }
+      contents.add(newestContent);
+
+      final response = await _model.generateContent(contents);
+      return response.text ?? 'I could not generate a response. Please try again.';
+    } catch (e) {
+      return 'An error occurred: $e';
+    }
+  }
+
+  // ─── Web Summary Generator ────────────────────────────────────────────────
+
+  Future<String> generateWebSummary(String url, String rawText) async {
+    try {
+      final truncated = rawText.length > 8000
+          ? rawText.substring(0, 8000)
+          : rawText;
+      final response = await _model.generateContent([
+        Content.text(
+          'You are given raw text scraped from the webpage at: $url\n\n'
+          'Generate a comprehensive, well-structured knowledge document capturing all key information from this page.\n'
+          'Structure: Start with the page title, then a 2-3 sentence overview, then main sections with ## headers, '
+          'key facts/data as bullet points, and a brief conclusion.\n'
+          'This document will be used as a queryable knowledge base — be thorough and precise.\n'
+          'Target length: 400–800 words.\n\n'
+          'RAW PAGE TEXT:\n$truncated',
+        ),
+      ]);
+      return response.text ?? rawText.substring(0, rawText.length.clamp(0, 2000));
+    } catch (e) {
+      return rawText.substring(0, rawText.length.clamp(0, 2000));
+    }
+  }
+
   // ─── Audio Transcription ──────────────────────────────────────────────────
 
   /// Sends raw audio bytes to Gemini 2.5 Flash for native transcription.

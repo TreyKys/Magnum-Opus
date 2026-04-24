@@ -1,27 +1,19 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:markdown_widget/markdown_widget.dart';
-import 'package:markdown_widget/config/configs.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:markdown/markdown.dart' as m;
 
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
-import 'package:magnum_opus/features/vault/models/chat_message.dart';
-import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
-import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
-import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
-import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
 
-// ─── LaTeX rendering (unchanged from v1) ─────────────────────────────────────
+// ─── LaTeX rendering ──────────────────────────────────────────────────────────
 
 class LatexSyntax extends m.InlineSyntax {
   LatexSyntax() : super(r'\$(.+?)\$');
@@ -98,16 +90,9 @@ class LatexNode extends SpanNode {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 class PdfViewerScreen extends ConsumerStatefulWidget {
-  final String id;
-  final String filePath;
-  final String title;
+  final DocumentModel document;
 
-  const PdfViewerScreen({
-    super.key,
-    required this.id,
-    required this.filePath,
-    required this.title,
-  });
+  const PdfViewerScreen({super.key, required this.document});
 
   @override
   ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
@@ -116,9 +101,6 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
 class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     with TickerProviderStateMixin {
   final PdfViewerController _pdfViewerController = PdfViewerController();
-  final TextEditingController _chatController = TextEditingController();
-  final GlobalKey _pdfViewerKey = GlobalKey();
-  final ScrollController _chatScrollController = ScrollController();
 
   int _currentPage = 1;
   int _pageCount = 0;
@@ -134,7 +116,6 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
 
   String _selectedTip = '';
 
-  // Reading tips (preserved from v1, app-specific entries updated)
   static const List<String> _tips = [
     'Use active recall and spaced repetition to remember document content.',
     'Highlight sparingly; it helps important text stand out more effectively.',
@@ -157,9 +138,6 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     'Background processes automatically retry if the app is unexpectedly closed.',
     'Powered by Riverpod state management for flawless, reactive UI updates.',
   ];
-
-  RewardedAd? _rewardedAd;
-  bool _isAdLoaded = false;
 
   @override
   void initState() {
@@ -190,410 +168,11 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     _fadeController.forward();
   }
 
-  Future<Uint8List?> _capturePdfScreen() async {
-    try {
-      final boundary = _pdfViewerKey.currentContext?.findRenderObject()
-          as RenderRepaintBoundary?;
-      if (boundary == null) return null;
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  void _loadRewardedAd() {
-    const adUnitId = 'ca-app-pub-3940256099942544/5224354917';
-    RewardedAd.load(
-      adUnitId: adUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardedAd = ad;
-          _isAdLoaded = true;
-          _rewardedAd?.fullScreenContentCallback = FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (ad) {
-              ad.dispose();
-              _isAdLoaded = false;
-              _loadRewardedAd();
-            },
-            onAdFailedToShowFullScreenContent: (ad, err) {
-              ad.dispose();
-              _isAdLoaded = false;
-              _loadRewardedAd();
-            },
-          );
-        },
-        onAdFailedToLoad: (_) => _isAdLoaded = false,
-      ),
-    );
-  }
-
-  void _showIntelSheet() {
-    if (_isFullScreen) setState(() => _isFullScreen = false);
-    if (!_isAdLoaded) _loadRewardedAd();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Consumer(
-          builder: (context, ref, child) {
-            final chatMessages = ref.watch(chatProvider(widget.id));
-            final chatNotifier =
-                ref.read(chatProvider(widget.id).notifier);
-            final energy = ref.watch(energyProvider);
-            final energyNotifier = ref.read(energyProvider.notifier);
-
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_chatScrollController.hasClients) {
-                _chatScrollController.animateTo(
-                  _chatScrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              }
-            });
-
-            Future<void> handleSend(String value) async {
-              if (value.trim().isEmpty) return;
-              if (energy <= 0) {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: AppTheme.surface,
-                    title: const Text('Intel Depleted',
-                        style: TextStyle(color: AppTheme.accentBlueLight)),
-                    content: const Text(
-                        'Supercharge the engine to continue.',
-                        style: TextStyle(color: Colors.white70)),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('CANCEL',
-                            style: TextStyle(color: Colors.white54)),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          if (_isAdLoaded && _rewardedAd != null) {
-                            _rewardedAd?.show(
-                              onUserEarnedReward: (_, __) =>
-                                  energyNotifier.refillEnergy(),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Engine charging... try again in a moment.')),
-                            );
-                            _loadRewardedAd();
-                          }
-                        },
-                        child: const Text('SUPERCHARGE',
-                            style: TextStyle(
-                                color: AppTheme.accentBlueLight,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                );
-                return;
-              }
-              final imageBytes = await _capturePdfScreen();
-              await energyNotifier.consumeEnergy();
-              chatNotifier.sendMessage(value, imageBytes: imageBytes);
-              _chatController.clear();
-            }
-
-            return FractionallySizedBox(
-              heightFactor: 0.85,
-              child: Padding(
-                padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    // Header: energy + complexity + clear
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.bolt,
-                                      color: AppTheme.accentBlueLight,
-                                      size: 18),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '$energy Energy',
-                                    style: const TextStyle(
-                                      color: AppTheme.accentBlueLight,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline,
-                                    color: Colors.white54),
-                                onPressed: () => chatNotifier.clearChat(),
-                                tooltip: 'Clear Chat',
-                              ),
-                            ],
-                          ),
-                          const ComplexityMiniDial(),
-                        ],
-                      ),
-                    ),
-                    // Compile Report bar (only when messages exist)
-                    if (chatMessages.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
-                        color: AppTheme.surfaceVariant,
-                        child: Row(
-                          children: [
-                            const Icon(Icons.picture_as_pdf_outlined,
-                                color: AppTheme.textMuted, size: 14),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Compile this thread into a report',
-                                style: TextStyle(
-                                    color: AppTheme.textMuted, fontSize: 12),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () => ExportService.exportChatAsPdf(
-                                context,
-                                widget.title,
-                                chatMessages,
-                              ),
-                              child: const Text(
-                                'Export PDF',
-                                style: TextStyle(
-                                  color: AppTheme.accentBlueLight,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const Divider(color: AppTheme.border, height: 1),
-                    // Messages list
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _chatScrollController,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        itemCount: chatMessages.length +
-                            (chatNotifier.isThinking ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == chatMessages.length &&
-                              chatNotifier.isThinking) {
-                            return Align(
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surface,
-                                  borderRadius:
-                                      BorderRadius.circular(16).copyWith(
-                                          bottomLeft: Radius.zero),
-                                ),
-                                child: const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.accentBlue,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          final msg = chatMessages[index];
-                          return _buildMessageBubble(msg, chatNotifier);
-                        },
-                      ),
-                    ),
-                    // Input bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.surface,
-                        border: Border(
-                            top: BorderSide(
-                                color: AppTheme.border, width: 1)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _chatController,
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: handleSend,
-                              decoration: InputDecoration(
-                                hintText: 'Ask the document...',
-                                hintStyle: const TextStyle(
-                                    color: Colors.white54),
-                                filled: true,
-                                fillColor: AppTheme.background,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(
-                                      color: AppTheme.border),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(
-                                      color: AppTheme.border),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(
-                                      color: AppTheme.accentBlue),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.send,
-                                color: AppTheme.accentBlue),
-                            onPressed: () =>
-                                handleSend(_chatController.text),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildMessageBubble(ChatMessage msg, ChatNotifier chatNotifier) {
-    return Align(
-      alignment:
-          msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment:
-            msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!msg.isUser)
-            IconButton(
-              icon: Icon(
-                msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                color: msg.isPinned
-                    ? AppTheme.accentBlueLight
-                    : Colors.white38,
-                size: 18,
-              ),
-              onPressed: () =>
-                  chatNotifier.togglePin(msg.id, !msg.isPinned),
-              constraints:
-                  const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: EdgeInsets.zero,
-            ),
-          Flexible(
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: msg.isUser
-                    ? AppTheme.accentBlue
-                    : AppTheme.surface,
-                borderRadius: BorderRadius.circular(16).copyWith(
-                  bottomRight: msg.isUser
-                      ? Radius.zero
-                      : const Radius.circular(16),
-                  bottomLeft: !msg.isUser
-                      ? Radius.zero
-                      : const Radius.circular(16),
-                ),
-              ),
-              child: msg.isUser
-                  ? Text(msg.text,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 15))
-                  : MarkdownWidget(
-                      data: msg.text,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      config: MarkdownConfig.darkConfig,
-                      markdownGenerator: MarkdownGenerator(
-                        generators: [
-                          LatexGenerator(),
-                          LatexBlockGenerator()
-                        ],
-                        inlineSyntaxList: [LatexSyntax()],
-                        blockSyntaxList: [LatexBlockSyntax()],
-                      ),
-                    ),
-            ),
-          ),
-          if (msg.isUser)
-            IconButton(
-              icon: Icon(
-                msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                color: msg.isPinned
-                    ? AppTheme.accentBlueLight
-                    : Colors.white54,
-                size: 18,
-              ),
-              onPressed: () =>
-                  chatNotifier.togglePin(msg.id, !msg.isPinned),
-              constraints:
-                  const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: EdgeInsets.zero,
-            ),
-        ],
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _pdfViewerController.dispose();
-    _chatController.dispose();
-    _chatScrollController.dispose();
     _hoverController.dispose();
     _fadeController.dispose();
-    _rewardedAd?.dispose();
     super.dispose();
   }
 
@@ -607,7 +186,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
           ? null
           : AppBar(
               title: Text(
-                widget.title,
+                widget.document.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 16),
@@ -633,85 +212,86 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                 ),
               ],
             ),
-      body: Stack(
-        children: [
-          // PDF Viewer
-          RotatedBox(
-            quarterTurns: _quarterTurns,
-            child: RepaintBoundary(
-              key: _pdfViewerKey,
-              child: SfPdfViewer.file(
-                File(widget.filePath),
-                controller: _pdfViewerController,
-                canShowScrollHead: false,
-                canShowScrollStatus: false,
-                pageLayoutMode: PdfPageLayoutMode.continuous,
-                onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                  setState(() {
-                    _pageCount = details.document.pages.count;
-                    _isLoading = false;
-                  });
-                  Future.delayed(const Duration(milliseconds: 800), () {
-                    if (mounted) setState(() => _showLoadingScreen = false);
-                  });
-                  DatabaseHelper.instance
-                      .updateDocumentLastAccessed(widget.id);
-                },
-                onPageChanged: (PdfPageChangedDetails details) {
-                  setState(() => _currentPage = details.newPageNumber);
-                },
+      floatingActionButton: _isFullScreen || _isLoading
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: AppTheme.accentBlue,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.chat_bubble_outline, size: 20),
+              label: const Text('Chat',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      DocumentChatScreen(document: widget.document),
+                ),
               ),
             ),
+      body: Stack(
+        children: [
+          RotatedBox(
+            quarterTurns: _quarterTurns,
+            child: SfPdfViewer.file(
+              File(widget.document.filePath),
+              controller: _pdfViewerController,
+              canShowScrollHead: false,
+              canShowScrollStatus: false,
+              pageLayoutMode: PdfPageLayoutMode.continuous,
+              onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                setState(() {
+                  _pageCount = details.document.pages.count;
+                  _isLoading = false;
+                });
+                Future.delayed(const Duration(milliseconds: 800), () {
+                  if (mounted) setState(() => _showLoadingScreen = false);
+                });
+                DatabaseHelper.instance
+                    .updateDocumentLastAccessed(widget.document.id);
+              },
+              onPageChanged: (PdfPageChangedDetails details) {
+                setState(() => _currentPage = details.newPageNumber);
+              },
+            ),
           ),
-          // Control bar
+          // Control bar (page count + rotate + fullscreen)
           if (!_isLoading && _pageCount > 0 && !_isFullScreen)
             Positioned(
-              bottom: 32,
+              bottom: 96,
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  height: 60,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: AppTheme.border),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.fullscreen,
-                            color: Colors.white70),
+                            color: Colors.white70, size: 20),
                         onPressed: () =>
                             setState(() => _isFullScreen = true),
                       ),
                       IconButton(
                         icon: const Icon(Icons.rotate_right,
-                            color: Colors.white70),
+                            color: Colors.white70, size: 20),
                         onPressed: () => setState(
                             () => _quarterTurns = (_quarterTurns + 1) % 4),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$_currentPage / $_pageCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        child: FloatingActionButton(
-                          mini: true,
-                          elevation: 0,
-                          backgroundColor: AppTheme.accentBlue,
-                          foregroundColor: Colors.white,
-                          onPressed: _showIntelSheet,
-                          child: const Icon(Icons.auto_awesome),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '$_currentPage / $_pageCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -728,10 +308,11 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                 backgroundColor: Colors.black.withOpacity(0.5),
                 elevation: 0,
                 onPressed: () => setState(() => _isFullScreen = false),
-                child: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                child: const Icon(Icons.fullscreen_exit,
+                    color: Colors.white),
               ),
             ),
-          // Loading screen with tips (preserved from v1)
+          // Loading screen
           if (_showLoadingScreen)
             AnimatedOpacity(
               opacity: _isLoading ? 1.0 : 0.0,
@@ -771,8 +352,8 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         FadeTransition(
                           opacity: _fadeAnimation,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 40.0),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 40),
                             child: Text(
                               _selectedTip,
                               textAlign: TextAlign.center,
