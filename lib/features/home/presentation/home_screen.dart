@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/chat/presentation/standalone_chat_screen.dart';
+import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
@@ -412,13 +415,40 @@ class _QuickIngestGrid extends StatelessWidget {
         },
       ),
       _IngestButton(
-        icon: Icons.table_chart_outlined,
-        iconColor: AppTheme.badgeXlsx,
-        title: 'Data & Slides',
-        sub: 'XLSX, PPTX',
-        onTap: () {
+        icon: Icons.camera_alt_outlined,
+        iconColor: AppTheme.badgePptx,
+        title: 'Sniper',
+        sub: 'Capture & ask AI',
+        onTap: () async {
           HapticFeedback.lightImpact();
-          ref.read(vaultProvider.notifier).ingestData();
+          final picked = await ImagePicker().pickImage(
+            source: ImageSource.camera,
+            imageQuality: 85,
+          );
+          if (picked == null) return;
+          final bytes = await picked.readAsBytes();
+          final id = await ref
+              .read(standaloneChatProvider.notifier)
+              .createSession();
+          if (id == null) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Session limit reached (5/5). Archive one to continue.'),
+              ));
+            }
+            return;
+          }
+          if (context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StandaloneChatScreen(
+                  sessionId: id,
+                  initialImageBytes: bytes,
+                ),
+              ),
+            );
+          }
         },
       ),
     ];

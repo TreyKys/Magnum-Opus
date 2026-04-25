@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -9,12 +11,20 @@ import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.da
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
 import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 
 class StandaloneChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
-  const StandaloneChatScreen({super.key, required this.sessionId});
+  final Uint8List? initialImageBytes;
+  const StandaloneChatScreen({
+    super.key,
+    required this.sessionId,
+    this.initialImageBytes,
+  });
 
   @override
   ConsumerState<StandaloneChatScreen> createState() => _StandaloneChatScreenState();
@@ -30,6 +40,22 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
   void initState() {
     super.initState();
     _loadAd();
+    if (widget.initialImageBytes != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _sendImage(widget.initialImageBytes!);
+      });
+    }
+  }
+
+  void _sendImage(Uint8List bytes) {
+    final energy = ref.read(energyProvider);
+    if (energy <= 0) return;
+    ref.read(energyProvider.notifier).consumeEnergy();
+    ref.read(sessionMessagesProvider(widget.sessionId).notifier).sendMessage(
+          'What\'s in this image?',
+          imageBytes: bytes,
+        );
+    Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
   }
 
   @override
@@ -150,6 +176,17 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(
+              hasDoc ? Icons.link_off : Icons.attach_file,
+              color: AppTheme.textSecondary,
+              size: 20,
+            ),
+            tooltip: hasDoc ? 'Detach document' : 'Attach document',
+            onPressed: () => hasDoc
+                ? _detachDoc()
+                : _showAttachSheet(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined,
                 color: AppTheme.textSecondary, size: 20),
             tooltip: 'Export PDF',
@@ -196,6 +233,120 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
         ],
       ),
     );
+  }
+
+  void _detachDoc() {
+    ref.read(standaloneChatProvider.notifier).detachDocument(widget.sessionId);
+  }
+
+  void _showAttachSheet(BuildContext context) {
+    final docs = ref.read(vaultProvider).documents;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                'Attach Document',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (docs.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text(
+                  'No documents in vault yet.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.45,
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: docs.length,
+                  itemBuilder: (_, i) {
+                    final doc = docs[i];
+                    return ListTile(
+                      leading: Icon(
+                        _docIcon(doc.type),
+                        color: _docIconColor(doc.type),
+                        size: 22,
+                      ),
+                      title: Text(
+                        doc.title,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          doc.type.toUpperCase(),
+                          style: const TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      onTap: () {
+                        ref
+                            .read(standaloneChatProvider.notifier)
+                            .attachDocument(widget.sessionId, doc.id);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _docIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'pdf': return Icons.picture_as_pdf_outlined;
+      case 'docx': return Icons.description_outlined;
+      case 'pptx': return Icons.slideshow_outlined;
+      case 'xlsx': return Icons.table_chart_outlined;
+      case 'epub': return Icons.menu_book_outlined;
+      case 'audio': return Icons.audiotrack_outlined;
+      case 'url': return Icons.link_outlined;
+      default: return Icons.insert_drive_file_outlined;
+    }
+  }
+
+  Color _docIconColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'pdf': return AppTheme.badgePdf;
+      case 'docx': return AppTheme.badgeDocx;
+      case 'pptx': return AppTheme.badgePptx;
+      case 'xlsx': return AppTheme.badgeXlsx;
+      default: return AppTheme.textMuted;
+    }
   }
 
   String _initials(String name) {
@@ -433,6 +584,14 @@ class _NoEnergyBanner extends StatelessWidget {
                   style: TextStyle(
                       color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
             ),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UpgradeScreen()),
+            ),
+            child: const Text('Upgrade',
+                style: TextStyle(color: Colors.white54, fontSize: 12)),
+          ),
         ],
       ),
     );

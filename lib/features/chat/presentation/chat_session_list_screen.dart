@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/chat/models/chat_session_model.dart';
+import 'package:magnum_opus/features/chat/presentation/archived_sessions_screen.dart';
 import 'package:magnum_opus/features/chat/presentation/standalone_chat_screen.dart';
 import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 
 class ChatSessionListScreen extends ConsumerWidget {
@@ -23,6 +25,17 @@ class ChatSessionListScreen extends ConsumerWidget {
         title: const Text('Chat',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.inventory_2_outlined,
+                color: AppTheme.textSecondary, size: 20),
+            tooltip: 'Archived sessions',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ArchivedSessionsScreen()),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.accentBlue,
@@ -67,7 +80,16 @@ class ChatSessionListScreen extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK', style: TextStyle(color: AppTheme.accentBlueLight)),
+              child: const Text('OK', style: TextStyle(color: Colors.white54)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const UpgradeScreen()));
+              },
+              child: const Text('Learn about Pro',
+                  style: TextStyle(color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
             ),
           ],
         ),

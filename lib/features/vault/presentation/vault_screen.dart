@@ -15,48 +15,19 @@ class VaultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vaultState = ref.watch(vaultProvider);
     final documents = vaultState.documents;
-    final recentDocuments = List.of(documents)
-      ..sort((a, b) => b.lastAccessed.compareTo(a.lastAccessed));
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Magnum Opus'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.pushNamed(context, '/settings');
-              },
-            ),
-          ],
-          bottom: TabBar(
-            tabs: [
-              Tab(text: documents.isEmpty ? 'VAULT' : 'VAULT  (${documents.length})'),
-              const Tab(text: 'RECENTS'),
-            ],
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          documents.isEmpty ? 'Library' : 'Library  (${documents.length})',
         ),
-        body: Column(
-          children: [
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildDocumentList(
-                      context, ref, documents, vaultState.indexingDocumentIds),
-                  _buildDocumentList(
-                      context, ref, recentDocuments, vaultState.indexingDocumentIds),
-                ],
-              ),
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showIngestSheet(context, ref),
-          child: const Icon(Icons.add),
-        ),
+        automaticallyImplyLeading: false,
+      ),
+      body: _buildDocumentList(
+          context, ref, documents, vaultState.indexingDocumentIds),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showIngestSheet(context, ref),
+        child: const Icon(Icons.add),
       ),
     );
   }

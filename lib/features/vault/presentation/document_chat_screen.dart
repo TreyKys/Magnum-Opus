@@ -12,6 +12,7 @@ import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
 import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 
 class DocumentChatScreen extends ConsumerStatefulWidget {
   final DocumentModel document;
@@ -460,6 +461,14 @@ class _NoEnergyBanner extends StatelessWidget {
                     fontWeight: FontWeight.w700),
               ),
             ),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UpgradeScreen()),
+            ),
+            child: const Text('Upgrade',
+                style: TextStyle(color: Colors.white54, fontSize: 12)),
+          ),
         ],
       ),
     );

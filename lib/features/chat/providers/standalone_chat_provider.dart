@@ -205,8 +205,6 @@ class StandaloneChatNotifier extends Notifier<StandaloneChatState> {
     );
     await DatabaseHelper.instance.insertStandaloneSession(session.toMap());
     await _loadSessions();
-    // Consume a query slot
-    await ref.read(energyProvider.notifier).consumeEnergy();
     return id;
   }
 
@@ -236,6 +234,18 @@ class StandaloneChatNotifier extends Notifier<StandaloneChatState> {
   Future<void> attachDocument(String sessionId, String documentId) async {
     await DatabaseHelper.instance.updateStandaloneSession(
         sessionId, {'attached_document_id': documentId});
+    await _loadSessions();
+  }
+
+  Future<void> detachDocument(String sessionId) async {
+    await DatabaseHelper.instance.updateStandaloneSession(
+        sessionId, {'attached_document_id': null});
+    await _loadSessions();
+  }
+
+  Future<void> restoreSession(String id) async {
+    await DatabaseHelper.instance
+        .updateStandaloneSession(id, {'is_archived': 0});
     await _loadSessions();
   }
 }
