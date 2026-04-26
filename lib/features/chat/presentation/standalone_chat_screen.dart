@@ -283,8 +283,8 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
                     final doc = docs[i];
                     return ListTile(
                       leading: Icon(
-                        _docIcon(doc.type),
-                        color: _docIconColor(doc.type),
+                        _docIcon(doc.fileType),
+                        color: _docIconColor(doc.fileType),
                         size: 22,
                       ),
                       title: Text(
@@ -302,7 +302,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          doc.type.toUpperCase(),
+                          doc.fileType.toUpperCase(),
                           style: const TextStyle(
                               color: AppTheme.textMuted,
                               fontSize: 9,

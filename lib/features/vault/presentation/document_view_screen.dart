@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:archive/archive.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -313,7 +313,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
       for (int i = 0; i < sheet.maxRows; i++) {
         final row = sheet.row(i);
         final cells = List<String>.generate(
-          sheet.maxCols,
+          sheet.maxColumns,
           (j) => j < row.length ? (row[j]?.value?.toString() ?? '') : '',
         );
         if (cells.every((c) => c.isEmpty)) continue;
