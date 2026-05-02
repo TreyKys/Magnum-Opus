@@ -197,18 +197,36 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.zoom_in),
-                  onPressed: () {
+                  icon: const Icon(Icons.zoom_out, size: 22),
+                  tooltip: 'Zoom out',
+                  onPressed: () => setState(() {
                     _pdfViewerController.zoomLevel =
-                        _pdfViewerController.zoomLevel + 0.25;
-                  },
+                        (_pdfViewerController.zoomLevel - 0.25).clamp(0.75, 3.0);
+                  }),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _pdfViewerController.zoomLevel =
+                        ref.read(settingsProvider).defaultZoomLevel;
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                    child: Text(
+                      '${(_pdfViewerController.zoomLevel * 100).round()}%',
+                      style: const TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.zoom_out),
-                  onPressed: () {
+                  icon: const Icon(Icons.zoom_in, size: 22),
+                  tooltip: 'Zoom in',
+                  onPressed: () => setState(() {
                     _pdfViewerController.zoomLevel =
-                        _pdfViewerController.zoomLevel - 0.25;
-                  },
+                        (_pdfViewerController.zoomLevel + 0.25).clamp(0.75, 3.0);
+                  }),
                 ),
               ],
             ),

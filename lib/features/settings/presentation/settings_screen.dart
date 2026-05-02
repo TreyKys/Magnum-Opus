@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
@@ -165,7 +166,7 @@ class SettingsScreen extends ConsumerWidget {
               const ListTile(
                 title: Text('Version',
                     style: TextStyle(color: Colors.white)),
-                subtitle: Text('2.0.0 (Magnum Opus)',
+                subtitle: Text('3.1.0 (Magnum Opus)',
                     style: TextStyle(color: AppTheme.textMuted)),
               ),
               const ListTile(
@@ -184,6 +185,9 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 40),
+          const _NeuroDevFooter(),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -259,6 +263,53 @@ class SettingsScreen extends ConsumerWidget {
             border: Border.all(color: AppTheme.border),
           ),
           child: Column(children: children),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── NeuroDev Labs footer ─────────────────────────────────────────────────────
+
+class _NeuroDevFooter extends StatelessWidget {
+  const _NeuroDevFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 48,
+          height: 1,
+          color: AppTheme.border,
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'BUILT BY',
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'NeuroDev Labs',
+          style: GoogleFonts.average(
+            color: Colors.white.withOpacity(0.85),
+            fontSize: 22,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Intelligence. Engineered.',
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 11,
+            letterSpacing: 0.5,
+          ),
         ),
       ],
     );

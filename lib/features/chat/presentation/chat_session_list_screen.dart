@@ -56,7 +56,7 @@ class ChatSessionListScreen extends ConsumerWidget {
                         itemCount: sessions.length,
                         itemBuilder: (_, i) => _SessionCard(
                           session: sessions[i],
-                          onTap: () => _openSession(context, sessions[i].id),
+                          onTap: () => _openSession(context, ref, sessions[i].id),
                         ),
                       ),
                     ),
@@ -98,17 +98,15 @@ class ChatSessionListScreen extends ConsumerWidget {
     }
     final id = await ref.read(standaloneChatProvider.notifier).createSession();
     if (id != null && context.mounted) {
-      _openSession(context, id);
+      _openSession(context, ref, id);
     }
   }
 
-  void _openSession(BuildContext context, String id) {
+  void _openSession(BuildContext context, WidgetRef ref, String id) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => StandaloneChatScreen(sessionId: id)),
-    ).then((_) {
-      // Refresh session list on return
-    });
+    ).then((_) => ref.read(standaloneChatProvider.notifier).reload());
   }
 }
 

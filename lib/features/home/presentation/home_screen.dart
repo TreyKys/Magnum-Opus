@@ -12,6 +12,7 @@ import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
 import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/document_view_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
+import 'package:magnum_opus/features/vault/presentation/vault_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -46,15 +47,54 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          const SliverToBoxAdapter(
-            child: _SectionLabel('RECENT DOCUMENTS'),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'RECENT DOCUMENTS',
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  if (docs.length > 3)
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const VaultScreen(),
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'See all →',
+                        style: TextStyle(
+                          color: AppTheme.accentBlueLight,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
           SliverToBoxAdapter(
             child: recentDocs.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'No documents yet',
+                      'No documents yet — add one below',
                       style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                     ),
                   )

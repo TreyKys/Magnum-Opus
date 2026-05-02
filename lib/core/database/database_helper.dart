@@ -147,6 +147,12 @@ CREATE TABLE standalone_messages (
   FOREIGN KEY (session_id) REFERENCES standalone_sessions(id) ON DELETE CASCADE
 )
 ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_messages_session ON standalone_messages(session_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sessions_archived ON standalone_sessions(is_archived)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sessions_pinned ON standalone_sessions(is_pinned)');
   }
 
   // ─── Documents ────────────────────────────────────────────────────────────

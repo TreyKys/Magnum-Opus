@@ -127,6 +127,10 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
   List<String> _tableHeaders = [];
   List<List<String>> _tableRows = [];
 
+  // Zoom / font-scale state
+  double _webFontScale = 1.0;
+  double _txtFontSize = 16.5;
+
   late AnimationController _hoverController;
   late Animation<double> _hoverAnimation;
   late AnimationController _fadeController;
@@ -459,7 +463,24 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
     );
   }
 
+  void _zoomWebView(double delta) {
+    _webFontScale = (_webFontScale + delta).clamp(0.7, 2.5);
+    final pct = (_webFontScale * 100).round();
+    _webViewController?.runJavaScript(
+      "document.documentElement.style.fontSize='${pct}%';",
+    );
+    setState(() {});
+  }
+
+  void _zoomTxt(double delta) {
+    setState(() => _txtFontSize = (_txtFontSize + delta).clamp(10.0, 32.0));
+  }
+
   PreferredSizeWidget _buildAppBar(Color typeColor) {
+    final ft = widget.document.fileType;
+    final isWeb = ft == 'docx' || ft == 'pptx' || ft == 'epub';
+    final isTxt = ft == 'txt' || ft == 'audio' || ft == 'url';
+
     return AppBar(
       backgroundColor: AppTheme.background,
       elevation: 0,
@@ -483,6 +504,20 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
         ],
       ),
       actions: [
+        if (!_isLoading && (isWeb || isTxt)) ...[
+          IconButton(
+            icon: const Icon(Icons.text_decrease, size: 20),
+            color: AppTheme.textSecondary,
+            tooltip: 'Decrease text size',
+            onPressed: isWeb ? () => _zoomWebView(-0.1) : () => _zoomTxt(-1.5),
+          ),
+          IconButton(
+            icon: const Icon(Icons.text_increase, size: 20),
+            color: AppTheme.textSecondary,
+            tooltip: 'Increase text size',
+            onPressed: isWeb ? () => _zoomWebView(0.1) : () => _zoomTxt(1.5),
+          ),
+        ],
         Padding(
           padding: const EdgeInsets.only(right: 16, top: 10, bottom: 10),
           child: Container(
@@ -535,10 +570,10 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
                   )
                 : SelectableText(
                     _textContent,
-                    style: const TextStyle(
-                      fontSize: 16.5,
+                    style: TextStyle(
+                      fontSize: _txtFontSize,
                       height: 1.72,
-                      color: Color(0xFFE2E2E2),
+                      color: const Color(0xFFE2E2E2),
                       letterSpacing: 0.15,
                     ),
                   ),

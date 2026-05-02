@@ -14,6 +14,52 @@ class AiService {
     _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
   }
 
+  // ─── Retry with exponential backoff ──────────────────────────────────────────
+
+  Future<T> _withRetry<T>(Future<T> Function() fn, {int maxAttempts = 3}) async {
+    Object? lastError;
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        lastError = e;
+        if (!_isRetryable(e) || attempt == maxAttempts - 1) rethrow;
+        await Future.delayed(Duration(seconds: 1 << attempt)); // 1s, 2s, 4s
+      }
+    }
+    throw lastError!;
+  }
+
+  bool _isRetryable(Object e) {
+    final s = e.toString().toLowerCase();
+    return s.contains('429') ||
+        s.contains('quota') ||
+        s.contains('resource_exhausted') ||
+        s.contains('resourceexhausted') ||
+        s.contains('503') ||
+        s.contains('unavailable') ||
+        s.contains('internal') ||
+        s.contains('deadline_exceeded') ||
+        s.contains('network');
+  }
+
+  String _friendlyError(Object e) {
+    final s = e.toString().toLowerCase();
+    if (s.contains('429') || s.contains('quota') || s.contains('resource_exhausted') || s.contains('resourceexhausted')) {
+      return 'The AI service is experiencing high demand right now. Please wait a moment and try again.';
+    }
+    if (s.contains('503') || s.contains('unavailable')) {
+      return 'AI service is temporarily unavailable. Please try again shortly.';
+    }
+    if (s.contains('api key') || s.contains('authentication') || s.contains('unauthorized')) {
+      return 'There was an issue with the AI connection. Please restart the app.';
+    }
+    if (s.contains('network') || s.contains('socket') || s.contains('connection')) {
+      return 'No internet connection. Please check your network and try again.';
+    }
+    return 'Something went wrong. Please try again in a moment.';
+  }
+
   // ─── Complexity-Aware System Prompt ───────────────────────────────────────
 
   String _complexityInstruction(int complexity) {
@@ -89,33 +135,33 @@ $userQuery
 ''';
 
     try {
-      final List<Content> contents = [];
+      return await _withRetry(() async {
+        final List<Content> contents = [];
 
-      // Conversational memory
-      for (final msg in history) {
-        if (msg.isUser) {
-          contents.add(Content.text(msg.text));
-        } else {
-          contents.add(Content.model([TextPart(msg.text)]));
+        for (final msg in history) {
+          if (msg.isUser) {
+            contents.add(Content.text(msg.text));
+          } else {
+            contents.add(Content.model([TextPart(msg.text)]));
+          }
         }
-      }
 
-      // Newest query — with optional Sniper Vision image
-      Content newestContent;
-      if (imageBytes != null) {
-        newestContent = Content.multi([
-          TextPart(prompt),
-          DataPart('image/png', imageBytes),
-        ]);
-      } else {
-        newestContent = Content.text(prompt);
-      }
-      contents.add(newestContent);
+        Content newestContent;
+        if (imageBytes != null) {
+          newestContent = Content.multi([
+            TextPart(prompt),
+            DataPart('image/png', imageBytes),
+          ]);
+        } else {
+          newestContent = Content.text(prompt);
+        }
+        contents.add(newestContent);
 
-      final response = await _model.generateContent(contents);
-      return response.text ?? 'I could not generate a response. Please try again.';
+        final response = await _model.generateContent(contents);
+        return response.text ?? 'I could not generate a response. Please try again.';
+      });
     } catch (e) {
-      return 'An error occurred while communicating with the AI: $e';
+      return _friendlyError(e);
     }
   }
 
@@ -137,31 +183,33 @@ Respond naturally to the user's message. Format your response with clean spacing
 If the user attaches an image, analyse it carefully and answer their question about it.''';
 
     try {
-      final List<Content> contents = [];
+      return await _withRetry(() async {
+        final List<Content> contents = [];
 
-      for (final msg in history) {
-        if (msg.isUser) {
-          contents.add(Content.text(msg.text));
-        } else {
-          contents.add(Content.model([TextPart(msg.text)]));
+        for (final msg in history) {
+          if (msg.isUser) {
+            contents.add(Content.text(msg.text));
+          } else {
+            contents.add(Content.model([TextPart(msg.text)]));
+          }
         }
-      }
 
-      Content newestContent;
-      if (imageBytes != null) {
-        newestContent = Content.multi([
-          TextPart('$systemInstruction\n\n---\nUSER: $query'),
-          DataPart('image/png', imageBytes),
-        ]);
-      } else {
-        newestContent = Content.text('$systemInstruction\n\n---\nUSER: $query');
-      }
-      contents.add(newestContent);
+        Content newestContent;
+        if (imageBytes != null) {
+          newestContent = Content.multi([
+            TextPart('$systemInstruction\n\n---\nUSER: $query'),
+            DataPart('image/png', imageBytes),
+          ]);
+        } else {
+          newestContent = Content.text('$systemInstruction\n\n---\nUSER: $query');
+        }
+        contents.add(newestContent);
 
-      final response = await _model.generateContent(contents);
-      return response.text ?? 'I could not generate a response. Please try again.';
+        final response = await _model.generateContent(contents);
+        return response.text ?? 'I could not generate a response. Please try again.';
+      });
     } catch (e) {
-      return 'An error occurred: $e';
+      return _friendlyError(e);
     }
   }
 
@@ -172,18 +220,20 @@ If the user attaches an image, analyse it carefully and answer their question ab
       final truncated = rawText.length > 8000
           ? rawText.substring(0, 8000)
           : rawText;
-      final response = await _model.generateContent([
-        Content.text(
-          'You are given raw text scraped from the webpage at: $url\n\n'
-          'Generate a comprehensive, well-structured knowledge document capturing all key information from this page.\n'
-          'Structure: Start with the page title, then a 2-3 sentence overview, then main sections with ## headers, '
-          'key facts/data as bullet points, and a brief conclusion.\n'
-          'This document will be used as a queryable knowledge base — be thorough and precise.\n'
-          'Target length: 400–800 words.\n\n'
-          'RAW PAGE TEXT:\n$truncated',
-        ),
-      ]);
-      return response.text ?? rawText.substring(0, rawText.length.clamp(0, 2000));
+      return await _withRetry(() async {
+        final response = await _model.generateContent([
+          Content.text(
+            'You are given raw text scraped from the webpage at: $url\n\n'
+            'Generate a comprehensive, well-structured knowledge document capturing all key information from this page.\n'
+            'Structure: Start with the page title, then a 2-3 sentence overview, then main sections with ## headers, '
+            'key facts/data as bullet points, and a brief conclusion.\n'
+            'This document will be used as a queryable knowledge base — be thorough and precise.\n'
+            'Target length: 400–800 words.\n\n'
+            'RAW PAGE TEXT:\n$truncated',
+          ),
+        ]);
+        return response.text ?? rawText.substring(0, rawText.length.clamp(0, 2000));
+      });
     } catch (e) {
       return rawText.substring(0, rawText.length.clamp(0, 2000));
     }
@@ -191,46 +241,46 @@ If the user attaches an image, analyse it carefully and answer their question ab
 
   // ─── Audio Transcription ──────────────────────────────────────────────────
 
-  /// Sends raw audio bytes to Gemini 2.5 Flash for native transcription.
-  /// Returns the full transcript text.
   Future<String> transcribeAudio(Uint8List audioBytes, String mimeType) async {
     try {
-      final response = await _model.generateContent([
-        Content.multi([
-          TextPart(
-            'Please transcribe this audio verbatim and completely. '
-            'If multiple speakers are present, label them as Speaker 1, Speaker 2, etc. '
-            'Format with timestamps every 60 seconds where possible (e.g. [00:60]). '
-            'Do not summarise — output the full transcript.',
-          ),
-          DataPart(mimeType, audioBytes),
-        ]),
-      ]);
-      return response.text ?? '';
+      return await _withRetry(() async {
+        final response = await _model.generateContent([
+          Content.multi([
+            TextPart(
+              'Please transcribe this audio verbatim and completely. '
+              'If multiple speakers are present, label them as Speaker 1, Speaker 2, etc. '
+              'Format with timestamps every 60 seconds where possible (e.g. [00:60]). '
+              'Do not summarise — output the full transcript.',
+            ),
+            DataPart(mimeType, audioBytes),
+          ]),
+        ]);
+        return response.text ?? '';
+      });
     } catch (e) {
-      throw Exception('Audio transcription failed: $e');
+      throw Exception(_friendlyError(e));
     }
   }
 
   // ─── Global Skeleton Generator ────────────────────────────────────────────
 
-  /// Generates a 200-word macro-context summary of the document.
-  /// Called once after extraction completes; stored in the documents table.
   Future<String> generateSkeleton(String sampleChunks) async {
     try {
-      final response = await _model.generateContent([
-        Content.text(
-          'You are summarising a document for a RAG system. '
-          'Based on the following text samples from throughout the document, '
-          'write a concise 150–200 word overview that captures: '
-          '(1) the document\'s core thesis or purpose, '
-          '(2) the main topics covered, '
-          '(3) the intended audience or context. '
-          'Be precise — this summary will be prepended to every future AI query about this document.\n\n'
-          'DOCUMENT SAMPLES:\n$sampleChunks',
-        ),
-      ]);
-      return response.text ?? '';
+      return await _withRetry(() async {
+        final response = await _model.generateContent([
+          Content.text(
+            'You are summarising a document for a RAG system. '
+            'Based on the following text samples from throughout the document, '
+            'write a concise 150–200 word overview that captures: '
+            '(1) the document\'s core thesis or purpose, '
+            '(2) the main topics covered, '
+            '(3) the intended audience or context. '
+            'Be precise — this summary will be prepended to every future AI query about this document.\n\n'
+            'DOCUMENT SAMPLES:\n$sampleChunks',
+          ),
+        ]);
+        return response.text ?? '';
+      });
     } catch (e) {
       return ''; // Non-fatal — skeleton is a best-effort enhancement
     }

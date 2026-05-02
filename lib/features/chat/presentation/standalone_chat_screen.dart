@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -213,11 +214,14 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                    itemCount: messages.length,
-                    itemBuilder: (_, i) => _MessageBubble(
-                      message: messages[i],
-                      initials: initials,
-                    ),
+                    itemCount: messages.length + (messages.isNotEmpty && messages.last.isUser ? 1 : 0),
+                    itemBuilder: (_, i) {
+                      if (i == messages.length) return const _TypingIndicator();
+                      return _MessageBubble(
+                        message: messages[i],
+                        initials: initials,
+                      );
+                    },
                   ),
           ),
           energy <= 0
@@ -369,6 +373,17 @@ class _MessageBubble extends ConsumerWidget {
     final complexity = ref.watch(complexityProvider);
     final depthLabel = complexityLabel(complexity);
 
+    void copyToClipboard() {
+      Clipboard.setData(ClipboardData(text: message.text));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Copied to clipboard'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
     if (message.isUser) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
@@ -377,14 +392,17 @@ class _MessageBubble extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E2A3A),
-                  borderRadius: BorderRadius.circular(16),
+              child: GestureDetector(
+                onLongPress: copyToClipboard,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E2A3A),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(message.text,
+                      style: const TextStyle(color: Colors.white, fontSize: 14)),
                 ),
-                child: Text(message.text,
-                    style: const TextStyle(color: Colors.white, fontSize: 14)),
               ),
             ),
             const SizedBox(width: 8),
@@ -403,37 +421,40 @@ class _MessageBubble extends ConsumerWidget {
     final parsed = _parseSources(message.text);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-              child: Text(
-                'MAGNUM OPUS · $depthLabel DEPTH',
-                style: const TextStyle(
-                  color: AppTheme.accentBlue,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
+      child: GestureDetector(
+        onLongPress: copyToClipboard,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                child: Text(
+                  'MAGNUM OPUS · $depthLabel DEPTH',
+                  style: const TextStyle(
+                    color: AppTheme.accentBlue,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-              child: MarkdownWidget(
-                data: parsed.body,
-                shrinkWrap: true,
-                config: MarkdownConfig.darkConfig,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                child: MarkdownWidget(
+                  data: parsed.body,
+                  shrinkWrap: true,
+                  config: MarkdownConfig.darkConfig,
+                ),
               ),
-            ),
-            for (final src in parsed.sources) _SourceChip(text: src),
-            const SizedBox(height: 8),
-          ],
+              for (final src in parsed.sources) _SourceChip(text: src),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -591,6 +612,87 @@ class _NoEnergyBanner extends StatelessWidget {
             ),
             child: const Text('Upgrade',
                 style: TextStyle(color: Colors.white54, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Typing indicator ─────────────────────────────────────────────────────────
+
+class _TypingIndicator extends StatefulWidget {
+  const _TypingIndicator();
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with TickerProviderStateMixin {
+  late final List<AnimationController> _controllers;
+  late final List<Animation<double>> _anims;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = List.generate(
+      3,
+      (i) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 500),
+      )..repeat(reverse: true, period: const Duration(milliseconds: 900)),
+    );
+    _anims = List.generate(3, (i) {
+      Future.delayed(Duration(milliseconds: i * 150), () {
+        if (mounted) _controllers[i].forward();
+      });
+      return Tween<double>(begin: 0.3, end: 1.0).animate(_controllers[i]);
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers) c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Thinking',
+                  style: TextStyle(
+                      color: AppTheme.accentBlue, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 8),
+                ...List.generate(3, (i) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: FadeTransition(
+                        opacity: _anims[i],
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.accentBlue,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    )),
+              ],
+            ),
           ),
         ],
       ),
