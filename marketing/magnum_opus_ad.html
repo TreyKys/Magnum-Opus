@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200;12..96,400;12..96,700;12..96,800;12..96,900&family=Average&display=swap" rel="stylesheet">
 <style>
 
-/* ─── Reset & Container ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -20,7 +19,6 @@ body {
   font-family: 'Bricolage Grotesque', sans-serif;
 }
 
-/* 9:16 viewport — design at 390×844 (iPhone 14), scale for preview */
 .stage {
   position: relative;
   width: 390px;
@@ -37,26 +35,21 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  padding: 48px 36px;
+  padding: 52px 36px 80px;
   opacity: 0;
   pointer-events: none;
   will-change: opacity, transform;
   transition: opacity 0.6s cubic-bezier(0.25,0.46,0.45,0.94),
               transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94);
 }
-.scene.active {
-  opacity: 1;
-  pointer-events: auto;
-}
+.scene.active { opacity: 1; pointer-events: auto; }
 
 /* ─── Progress bar ───────────────────────────────────────────────────────── */
 .progress-bar {
   position: absolute;
-  bottom: 32px;
-  left: 36px;
-  right: 36px;
+  bottom: 32px; left: 36px; right: 36px;
   height: 2px;
   background: rgba(255,255,255,0.1);
   border-radius: 2px;
@@ -73,86 +66,236 @@ body {
 /* ─── Scene dots ─────────────────────────────────────────────────────────── */
 .dots {
   position: absolute;
-  bottom: 48px;
-  left: 50%;
+  bottom: 48px; left: 50%;
   transform: translateX(-50%);
-  display: flex;
-  gap: 6px;
+  display: flex; gap: 6px;
   z-index: 100;
 }
-.dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.2);
-  transition: background 0.3s, transform 0.3s;
-}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: background 0.3s, transform 0.3s; }
 .dot.active { background: #2563EB; transform: scale(1.4); }
 
 /* ─── Shared text styles ─────────────────────────────────────────────────── */
 .label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #2563EB;
-  margin-bottom: 20px;
-  opacity: 0;
-  transform: translateY(10px);
+  font-size: 11px; font-weight: 700; letter-spacing: 3px;
+  text-transform: uppercase; color: #2563EB;
+  margin-bottom: 12px;
+  opacity: 0; transform: translateY(10px);
   transition: all 0.5s 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .scene.active .label { opacity: 1; transform: none; }
 
 .headline {
-  font-size: 52px;
-  font-weight: 900;
-  line-height: 1.05;
-  color: #fff;
-  text-align: center;
-  opacity: 0;
-  transform: translateY(20px);
+  font-size: 46px; font-weight: 900; line-height: 1.05;
+  color: #fff; text-align: center;
+  opacity: 0; transform: translateY(20px);
   transition: all 0.6s 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .scene.active .headline { opacity: 1; transform: none; }
 
 .sub {
-  font-size: 17px;
-  font-weight: 400;
-  color: rgba(255,255,255,0.45);
-  text-align: center;
-  margin-top: 16px;
-  line-height: 1.5;
-  opacity: 0;
-  transform: translateY(12px);
+  font-size: 15px; font-weight: 400;
+  color: rgba(255,255,255,0.45); text-align: center;
+  margin-top: 8px; line-height: 1.5;
+  opacity: 0; transform: translateY(12px);
   transition: all 0.5s 0.55s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .scene.active .sub { opacity: 1; transform: none; }
 
-.neon {
-  color: #3B82F6;
-  text-shadow: 0 0 40px rgba(59,130,246,0.6);
-}
-.neon-green { color: #34D399; text-shadow: 0 0 40px rgba(52,211,153,0.5); }
+.neon        { color: #3B82F6; text-shadow: 0 0 40px rgba(59,130,246,0.6); }
+.neon-green  { color: #34D399; text-shadow: 0 0 40px rgba(52,211,153,0.5); }
 .neon-purple { color: #A78BFA; text-shadow: 0 0 40px rgba(167,139,250,0.5); }
-.neon-amber { color: #FBBF24; text-shadow: 0 0 40px rgba(251,191,36,0.5); }
 
-/* ─── CTA pill ───────────────────────────────────────────────────────────── */
-.cta {
-  margin-top: 36px;
-  padding: 14px 32px;
-  border: 1.5px solid rgba(59,130,246,0.6);
-  border-radius: 40px;
-  color: #3B82F6;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
+/* ─── Phone shell ────────────────────────────────────────────────────────── */
+.phone-shell {
+  position: relative;
+  width: 204px; height: 374px;
+  background: #0a0a0a;
+  border-radius: 38px;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 32px 80px rgba(0,0,0,0.8),
+    inset 0 0 0 1px rgba(255,255,255,0.04),
+    0 0 48px rgba(59,130,246,0.07);
+  overflow: hidden;
+  flex-shrink: 0;
   opacity: 0;
-  transform: translateY(10px) scale(0.97);
-  transition: all 0.5s 0.75s cubic-bezier(0.25,0.46,0.45,0.94);
+  transform: translateY(30px) scale(0.93);
+  transition: opacity 0.85s 0.7s cubic-bezier(0.25,0.46,0.45,0.94),
+              transform 0.85s 0.7s cubic-bezier(0.25,0.46,0.45,0.94);
 }
-.scene.active .cta { opacity: 1; transform: none; }
+.scene.active .phone-shell { opacity: 1; transform: none; }
 
-/* ─── SCENE 1 — Background: White → Black ────────────────────────────────── */
+/* Dynamic island */
+.phone-island {
+  position: absolute; top: 10px; left: 50%;
+  transform: translateX(-50%);
+  width: 66px; height: 20px;
+  background: #000; border-radius: 12px; z-index: 20;
+}
+/* Physical side buttons */
+.phone-shell::before {
+  content: ''; position: absolute;
+  right: -3px; top: 84px;
+  width: 3px; height: 48px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 0 3px 3px 0;
+}
+.phone-shell::after {
+  content: ''; position: absolute;
+  left: -3px; top: 76px;
+  width: 3px; height: 30px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 3px 0 0 3px;
+  box-shadow: 0 44px 0 rgba(255,255,255,0.07);
+}
+
+.phone-screen {
+  width: 100%; height: 100%;
+  padding-top: 34px;
+  display: flex; flex-direction: column;
+  overflow: hidden; background: #0d0d0d;
+}
+
+/* ─── Home screen UI ─────────────────────────────────────────────────────── */
+.hs-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 2px 14px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.hs-title { font-size: 13px; font-weight: 800; color: #fff; }
+.hs-icons { display: flex; gap: 6px; }
+.hs-dot { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,0.07); }
+.hs-dot.blue { background: rgba(59,130,246,0.4); }
+
+.hs-section-label {
+  padding: 8px 14px 3px;
+  font-size: 7.5px; font-weight: 700; letter-spacing: 1.5px;
+  color: rgba(255,255,255,0.25); text-transform: uppercase;
+}
+
+.hs-doc-card {
+  margin: 3px 12px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px; padding: 7px 10px;
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.type-badge {
+  font-size: 6.5px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 2px 5px; border-radius: 4px; flex-shrink: 0;
+}
+.b-pdf  { background: rgba(239,68,68,0.2);  color: #F87171; }
+.b-epub { background: rgba(168,85,247,0.2); color: #C084FC; }
+.b-docx { background: rgba(59,130,246,0.2); color: #60A5FA; }
+.b-xlsx { background: rgba(34,197,94,0.2);  color: #4ADE80; }
+.b-pptx { background: rgba(249,115,22,0.2); color: #FB923C; }
+
+.doc-info { flex: 1; min-width: 0; }
+.doc-name { font-size: 8.5px; color: rgba(255,255,255,0.75); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-meta { font-size: 7px; color: rgba(255,255,255,0.25); margin-top: 1px; }
+
+.hs-session-row {
+  margin: 6px 12px 0;
+  background: rgba(59,130,246,0.08);
+  border: 1px solid rgba(59,130,246,0.18);
+  border-radius: 10px; padding: 7px 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.hs-session-lbl { font-size: 8px; color: rgba(255,255,255,0.5); }
+.hs-session-cnt { font-size: 7px; font-weight: 800; color: #3B82F6; letter-spacing: 0.5px; }
+
+.hs-quick-row {
+  display: flex; gap: 8px; justify-content: center;
+  padding: 8px 14px 0; margin-top: auto;
+}
+.hs-q-btn {
+  flex: 1; height: 32px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+.hs-q-btn.primary {
+  background: rgba(37,99,235,0.2);
+  border: 1px solid rgba(59,130,246,0.3);
+}
+
+/* ─── Chat screen UI ─────────────────────────────────────────────────────── */
+.chat-topbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.chat-back { font-size: 10px; color: #3B82F6; font-weight: 700; }
+.chat-title { font-size: 11px; font-weight: 600; color: #fff; flex: 1; }
+.chat-sub-lbl { font-size: 7px; color: rgba(255,255,255,0.3); display: block; }
+.rag-badge {
+  font-size: 6px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 2px 5px; border-radius: 4px;
+  background: rgba(52,211,153,0.15); color: #34D399;
+}
+
+.chat-body {
+  flex: 1; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 6px; overflow: hidden;
+}
+
+.msg-u {
+  align-self: flex-end;
+  background: #2563EB;
+  border-radius: 13px 13px 3px 13px;
+  padding: 6px 9px; max-width: 80%;
+}
+.msg-u span { font-size: 8px; color: #fff; line-height: 1.4; display: block; }
+
+.msg-a {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px 13px 13px 13px;
+  padding: 7px 9px; max-width: 90%;
+  border-left: 2px solid #2563EB;
+}
+.msg-a .ai-lbl { font-size: 6.5px; color: #3B82F6; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 3px; }
+.msg-a span { font-size: 7.5px; color: rgba(255,255,255,0.8); line-height: 1.5; display: block; }
+
+.chat-input-row {
+  padding: 5px 10px 8px;
+  display: flex; gap: 5px; align-items: center;
+}
+.chat-input-bar {
+  flex: 1; height: 26px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 13px;
+  border: 1px solid rgba(255,255,255,0.09);
+}
+.chat-send { width: 26px; height: 26px; background: #2563EB; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; flex-shrink: 0; }
+
+/* ─── Library screen UI ──────────────────────────────────────────────────── */
+.lib-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 14px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.lib-title { font-size: 13px; font-weight: 800; color: #fff; }
+.lib-count { font-size: 11px; color: #3B82F6; font-weight: 700; }
+
+.lib-search {
+  margin: 6px 12px;
+  height: 26px; background: rgba(255,255,255,0.06);
+  border-radius: 8px; display: flex; align-items: center;
+  padding: 0 9px; gap: 5px;
+}
+.lib-search-bar { flex: 1; height: 7px; background: rgba(255,255,255,0.1); border-radius: 4px; }
+.lib-search-icon { font-size: 9px; color: rgba(255,255,255,0.2); }
+
+.lib-row {
+  padding: 7px 12px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.lib-chev { font-size: 10px; color: rgba(255,255,255,0.15); }
+
+/* ─── SCENE 1 — White → Black ────────────────────────────────────────────── */
 #s1 {
   background: #fff;
   transition: background 1.2s 4s cubic-bezier(0.25,0.46,0.45,0.94),
@@ -161,232 +304,167 @@ body {
 }
 #s1.active { background: #fff; }
 #s1.flip-dark { background: #000; }
-
 #s1 .headline { color: #000; }
 #s1.flip-dark .headline { color: #fff; transition: color 0.8s 4.2s; }
 #s1 .sub { color: rgba(0,0,0,0.4); }
 #s1.flip-dark .sub { color: rgba(255,255,255,0.4); transition: color 0.8s 4.2s; }
 #s1 .label { color: #2563EB; }
+#s1 .phone-shell { margin-top: 18px; }
 
-/* "MEET MAGNUM" reveal on dark */
 #s1 .reveal-dark {
-  position: absolute;
-  bottom: 160px;
-  left: 0; right: 0;
-  text-align: center;
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: #3B82F6;
-  text-shadow: 0 0 40px rgba(59,130,246,0.7);
-  opacity: 0;
-  clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.8s 5.2s cubic-bezier(0.25,0.46,0.45,0.94),
-              opacity 0.1s 5.2s;
+  position: absolute; bottom: 152px; left: 0; right: 0;
+  text-align: center; font-size: 24px; font-weight: 800;
+  letter-spacing: 4px; text-transform: uppercase;
+  color: #3B82F6; text-shadow: 0 0 40px rgba(59,130,246,0.7);
+  opacity: 0; clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.8s 5.2s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.1s 5.2s;
 }
 #s1.flip-dark .reveal-dark { opacity: 1; clip-path: inset(0 0% 0 0); }
 
-/* ─── SCENE 2 — Background: Purple gradient → Black ─────────────────────── */
-#s2 {
-  background: linear-gradient(160deg, #1a0030 0%, #0d0d1a 100%);
-}
+/* ─── SCENE 2 — Purple → Black ───────────────────────────────────────────── */
+#s2 { background: linear-gradient(160deg, #1a0030 0%, #0d0d1a 100%); }
 #s2.flip-dark { background: #000; transition: background 1.2s 5.5s cubic-bezier(0.25,0.46,0.45,0.94); }
+#s2 .phone-shell { margin-top: 14px; }
 
-/* Cycling words: Research / Study / Work */
 .word-cycle {
-  position: relative;
-  height: 72px;
-  overflow: hidden;
-  width: 100%;
-  text-align: center;
+  position: relative; height: 66px; overflow: hidden;
+  width: 100%; text-align: center;
 }
 .word {
-  position: absolute;
-  left: 0; right: 0;
-  font-size: 64px;
-  font-weight: 900;
-  line-height: 72px;
-  color: #A78BFA;
-  text-shadow: 0 0 40px rgba(167,139,250,0.5);
-  transform: translateY(72px);
-  opacity: 0;
+  position: absolute; left: 0; right: 0;
+  font-size: 56px; font-weight: 900; line-height: 66px;
+  color: #A78BFA; text-shadow: 0 0 40px rgba(167,139,250,0.5);
+  transform: translateY(66px); opacity: 0;
   transition: transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94),
               opacity 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .word.visible { transform: translateY(0); opacity: 1; }
-.word.out { transform: translateY(-72px); opacity: 0; }
+.word.out { transform: translateY(-66px); opacity: 0; }
 
 .not-just {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: rgba(255,255,255,0.35);
-  text-align: center;
-  margin-top: 24px;
-  text-transform: uppercase;
-  opacity: 0;
-  transition: all 0.5s 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
+  font-size: 13px; font-weight: 700; letter-spacing: 2px;
+  color: rgba(255,255,255,0.35); text-align: center;
+  margin-top: 12px; text-transform: uppercase;
+  opacity: 0; transition: all 0.5s 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .scene.active .not-just { opacity: 1; }
 
 .but-better {
-  font-size: 52px;
-  font-weight: 900;
-  text-align: center;
-  margin-top: 4px;
-  color: #fff;
-  opacity: 0;
-  transform: translateY(16px);
+  font-size: 44px; font-weight: 900; text-align: center;
+  margin-top: 2px; color: #fff;
+  opacity: 0; transform: translateY(16px);
   transition: all 0.6s 1.6s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .scene.active .but-better { opacity: 1; transform: none; }
 
 #s2 .reveal-dark {
-  position: absolute;
-  bottom: 150px;
-  left: 0; right: 0;
-  text-align: center;
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: #A78BFA;
-  text-shadow: 0 0 40px rgba(167,139,250,0.7);
-  opacity: 0;
-  clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.8s 6.2s cubic-bezier(0.25,0.46,0.45,0.94),
-              opacity 0.1s 6.2s;
+  position: absolute; bottom: 144px; left: 0; right: 0;
+  text-align: center; font-size: 24px; font-weight: 800;
+  letter-spacing: 4px; text-transform: uppercase;
+  color: #A78BFA; text-shadow: 0 0 40px rgba(167,139,250,0.7);
+  opacity: 0; clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.8s 6.2s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.1s 6.2s;
 }
 #s2.flip-dark .reveal-dark { opacity: 1; clip-path: inset(0 0% 0 0); }
 
-/* ─── SCENE 3 — Your Documents SUPERCHARGED ─────────────────────────────── */
+/* ─── SCENE 3 ─────────────────────────────────────────────────────────────── */
 #s3 { background: #000; }
-
-/* Mock phone UI card */
-.mock-ui {
-  margin-top: 32px;
-  width: 280px;
-  background: #111;
-  border-radius: 20px;
-  border: 1px solid rgba(59,130,246,0.15);
-  padding: 16px;
-  opacity: 0;
-  transform: translateY(20px) scale(0.96);
-  transition: all 0.7s 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
-  box-shadow: 0 0 60px rgba(59,130,246,0.1);
-}
-.scene.active .mock-ui { opacity: 1; transform: none; }
-
-.mock-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.06);
-  margin-bottom: 8px;
-}
-.mock-bar.blue { background: rgba(59,130,246,0.3); width: 70%; }
-.mock-bar.short { width: 45%; }
-.mock-bar.med { width: 60%; }
-
-.mock-bubble {
-  background: rgba(37,99,235,0.12);
-  border-radius: 12px;
-  padding: 10px 12px;
-  margin: 10px 0;
-  border-left: 2px solid #2563EB;
-}
-.mock-bubble-bar {
-  height: 7px;
-  border-radius: 3px;
-  background: rgba(59,130,246,0.25);
-  margin-bottom: 5px;
-}
-.mock-bubble-bar.last { width: 65%; margin-bottom: 0; }
-.mock-tag {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  color: #3B82F6;
-  margin-bottom: 8px;
-}
+#s3 .phone-shell { margin-top: 20px; }
 
 .tagline {
-  margin-top: 28px;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-align: center;
-  color: rgba(255,255,255,0.55);
-  opacity: 0;
-  transform: translateY(10px);
-  transition: all 0.5s 1.4s cubic-bezier(0.25,0.46,0.45,0.94);
+  margin-top: 16px; font-size: 19px; font-weight: 700;
+  text-align: center; color: rgba(255,255,255,0.55);
+  opacity: 0; transform: translateY(10px);
+  transition: all 0.5s 1.6s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .scene.active .tagline { opacity: 1; transform: none; }
 .tagline strong { color: #3B82F6; }
 
-/* ─── SCENE 4 — Intelligence. Engineered. ───────────────────────────────── */
-#s4 { background: #000; }
-
-.brand-name {
-  font-family: 'Average', serif;
-  font-size: 20px;
-  letter-spacing: 2px;
-  color: rgba(255,255,255,0.5);
-  text-align: center;
-  margin-top: 24px;
-  opacity: 0;
-  transition: all 0.6s 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
+/* ─── SCENE 4 — Side layout ──────────────────────────────────────────────── */
+#s4 {
+  background: #000;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 40px 14px 80px 8px;
+  gap: 0;
 }
-.scene.active .brand-name { opacity: 1; }
 
-.play-badge {
-  margin-top: 40px;
-  display: block;
+/* 3D angled phone wrap */
+.s4-phone-wrap {
+  flex-shrink: 0;
+  width: 178px;
   opacity: 0;
+  transform: perspective(620px) rotateY(20deg) rotateX(3deg) translateX(-18px) translateY(10px) scale(0.88);
+  transition: opacity 0.9s 0.2s cubic-bezier(0.25,0.46,0.45,0.94),
+              transform 1.1s 0.2s cubic-bezier(0.16,1,0.3,1);
+}
+.scene.active .s4-phone-wrap {
+  opacity: 1;
+  transform: perspective(620px) rotateY(20deg) rotateX(3deg) translateX(-8px) translateY(0) scale(0.88);
+}
+/* Disable base phone-shell animation for s4 phone (parent handles it) */
+.s4-phone-wrap .phone-shell {
+  opacity: 1 !important; transform: none !important;
+  transition: none !important;
+  width: 174px; height: 352px; border-radius: 32px;
+}
+.s4-phone-wrap .phone-island { width: 60px; height: 18px; }
+
+/* Text column right side */
+.s4-text {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: flex-start; padding-left: 14px; min-width: 0;
+}
+.s4-text .label { font-size: 10px; margin-bottom: 8px; }
+.s4-text .headline { font-size: 30px; text-align: left; line-height: 1.1; }
+.s4-text .sub { text-align: left; font-size: 13px; margin-top: 10px; }
+.s4-text .divider { margin: 12px 0; width: 30px; }
+.s4-text .play-badge { margin-top: 14px; }
+.s4-text .brand-name { text-align: left; margin-top: 10px; font-size: 16px; }
+.s4-text .neurodev-mark { text-align: left; }
+
+/* Shared Scene 4 element styles */
+.play-badge {
+  display: block; opacity: 0;
   transform: translateY(12px) scale(0.97);
   transition: all 0.6s 1.6s cubic-bezier(0.25,0.46,0.45,0.94);
   cursor: pointer;
-  filter: drop-shadow(0 0 18px rgba(59,130,246,0.25));
+  filter: drop-shadow(0 0 12px rgba(59,130,246,0.2));
 }
 .scene.active .play-badge { opacity: 1; transform: none; }
 
-/* Divider line */
+.brand-name {
+  font-family: 'Average', serif; font-size: 20px;
+  letter-spacing: 2px; color: rgba(255,255,255,0.5);
+  text-align: center; margin-top: 24px;
+  opacity: 0; transition: all 0.6s 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .brand-name { opacity: 1; }
+
 .divider {
-  width: 40px;
-  height: 1px;
+  width: 40px; height: 1px;
   background: rgba(255,255,255,0.12);
-  margin: 20px auto;
-  opacity: 0;
+  margin: 20px auto; opacity: 0;
   transition: all 0.4s 1s;
 }
 .scene.active .divider { opacity: 1; }
 
-/* NeuroDev word mark on s4 */
 .neurodev-mark {
-  font-family: 'Average', serif;
-  font-size: 13px;
-  letter-spacing: 1.5px;
-  color: rgba(255,255,255,0.2);
-  text-align: center;
-  margin-top: 12px;
-  opacity: 0;
-  transition: all 0.4s 2s;
+  font-family: 'Average', serif; font-size: 13px;
+  letter-spacing: 1.5px; color: rgba(255,255,255,0.2);
+  text-align: center; margin-top: 12px;
+  opacity: 0; transition: all 0.4s 2s;
 }
 .scene.active .neurodev-mark { opacity: 1; }
 
-/* ─── Whip-pan / wipe transition overlay ────────────────────────────────── */
+/* ─── Wipe transition ────────────────────────────────────────────────────── */
 .wipe {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  z-index: 50;
-  transform: translateX(-110%);
-  will-change: transform;
-  border-radius: 40px;
+  position: absolute; inset: 0; background: #fff;
+  z-index: 50; transform: translateX(-110%);
+  will-change: transform; border-radius: 40px;
 }
-.wipe.go {
-  animation: wipePan 0.45s cubic-bezier(0.55,0,1,0.45) forwards;
-}
+.wipe.go { animation: wipePan 0.45s cubic-bezier(0.55,0,1,0.45) forwards; }
 @keyframes wipePan {
   0%   { transform: translateX(-110%); }
   45%  { transform: translateX(0%); }
@@ -394,16 +472,10 @@ body {
   100% { transform: translateX(110%); }
 }
 
-/* Beat-sync indicator (editor guide, hidden in export) */
 .beat-guide {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  font-size: 9px;
-  color: rgba(255,255,255,0.15);
-  letter-spacing: 1px;
-  z-index: 200;
-  font-family: monospace;
+  position: absolute; top: 16px; right: 16px;
+  font-size: 9px; color: rgba(255,255,255,0.15);
+  letter-spacing: 1px; z-index: 200; font-family: monospace;
 }
 
 </style>
@@ -412,35 +484,75 @@ body {
 
 <div class="stage">
 
-  <!-- Beat-sync guide for video editor -->
   <div class="beat-guide" id="beatGuide">SCENE 1 · 0:00</div>
-
-  <!-- Progress bar -->
   <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-
-  <!-- Scene dots -->
   <div class="dots">
     <div class="dot active" id="d0"></div>
     <div class="dot" id="d1"></div>
     <div class="dot" id="d2"></div>
     <div class="dot" id="d3"></div>
   </div>
-
-  <!-- Whip-pan wipe overlay -->
   <div class="wipe" id="wipe"></div>
 
-  <!-- ─── SCENE 1: Tired of Hallucinations? ─────────────────────── -->
+  <!-- ─── SCENE 1: Tired of Hallucinations? ───────────────────────────────── -->
   <div class="scene active" id="s1">
-    <div class="label">The Problem with AI</div>
-    <div class="headline" id="s1h">TIRED OF HALLUCINATIONS?</div>
+    <div class="label">The Problem With AI</div>
+    <div class="headline">TIRED OF<br>HALLUCINATIONS?</div>
     <div class="sub">AI that makes things up<br>is worse than no AI at all.</div>
+
+    <!-- Home screen mockup — dark frame shows on white AND black bg -->
+    <div class="phone-shell">
+      <div class="phone-island"></div>
+      <div class="phone-screen">
+        <div class="hs-topbar">
+          <span class="hs-title">Magnum Opus</span>
+          <div class="hs-icons">
+            <div class="hs-dot"></div>
+            <div class="hs-dot blue"></div>
+          </div>
+        </div>
+        <div class="hs-section-label">Recent Documents</div>
+        <div class="hs-doc-card">
+          <span class="type-badge b-pdf">PDF</span>
+          <div class="doc-info">
+            <div class="doc-name">Annual Report 2024.pdf</div>
+            <div class="doc-meta">128 pages · 4.2 MB</div>
+          </div>
+        </div>
+        <div class="hs-doc-card">
+          <span class="type-badge b-epub">EPUB</span>
+          <div class="doc-info">
+            <div class="doc-name">Deep Work — Cal Newport</div>
+            <div class="doc-meta">312 pages · 1.8 MB</div>
+          </div>
+        </div>
+        <div class="hs-doc-card">
+          <span class="type-badge b-docx">DOCX</span>
+          <div class="doc-info">
+            <div class="doc-name">Q4 Strategy Deck.docx</div>
+            <div class="doc-meta">48 pages · 2.1 MB</div>
+          </div>
+        </div>
+        <div class="hs-session-row">
+          <span class="hs-session-lbl">Active chat sessions</span>
+          <span class="hs-session-cnt">3 OPEN</span>
+        </div>
+        <div class="hs-quick-row">
+          <div class="hs-q-btn primary">📄</div>
+          <div class="hs-q-btn">🌐</div>
+          <div class="hs-q-btn">🎙️</div>
+          <div class="hs-q-btn">📷</div>
+        </div>
+      </div>
+    </div>
+
     <div class="reveal-dark">MEET MAGNUM OPUS →</div>
   </div>
 
-  <!-- ─── SCENE 2: Research / Study / Work ──────────────────────── -->
+  <!-- ─── SCENE 2: Research / Study / Work ────────────────────────────────── -->
   <div class="scene" id="s2">
-    <div style="margin-bottom: 16px;">
-      <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.3);text-align:center;text-transform:uppercase;margin-bottom:10px;">Whether you</div>
+    <div style="margin-bottom:6px;width:100%;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.3);text-align:center;text-transform:uppercase;margin-bottom:6px;">Whether you</div>
       <div class="word-cycle">
         <div class="word" id="w0">Research</div>
         <div class="word" id="w1">Study</div>
@@ -449,106 +561,227 @@ body {
     </div>
     <div class="not-just">— not just faster —</div>
     <div class="but-better">BUT <span class="neon-purple">BETTER.</span></div>
+
+    <!-- RAG chat mockup -->
+    <div class="phone-shell">
+      <div class="phone-island"></div>
+      <div class="phone-screen">
+        <div class="chat-topbar">
+          <span class="chat-back">‹</span>
+          <div style="flex:1;">
+            <div class="chat-title">Annual Report 2024
+              <span class="chat-sub-lbl">PDF · 128 pages</span>
+            </div>
+          </div>
+          <span class="rag-badge">RAG ✓</span>
+        </div>
+        <div class="chat-body">
+          <div class="msg-u">
+            <span>Summarise the key risks in Section 4.2</span>
+          </div>
+          <div class="msg-a">
+            <div class="ai-lbl">MAGNUM OPUS · p.47–51</div>
+            <span>Three principal risks: (1) APAC supply chain exposure, (2) FX volatility in Q3, and (3) EU data directive shifts — all cited directly from the document.</span>
+          </div>
+          <div class="msg-u">
+            <span>How does this compare to 2023?</span>
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <div class="chat-input-bar"></div>
+          <div class="chat-send">↑</div>
+        </div>
+      </div>
+    </div>
+
     <div class="reveal-dark">WITH MAGNUM OPUS →</div>
   </div>
 
-  <!-- ─── SCENE 3: Your Documents — Supercharged ────────────────── -->
+  <!-- ─── SCENE 3: Your Documents — Supercharged ──────────────────────────── -->
   <div class="scene" id="s3">
     <div class="label">Your Documents</div>
     <div class="headline">SUPER<span class="neon">CHARGED.</span></div>
 
-    <!-- Mock app UI -->
-    <div class="mock-ui">
-      <div class="mock-tag">MAGNUM OPUS · BALANCED DEPTH</div>
-      <div class="mock-bar blue"></div>
-      <div class="mock-bar short"></div>
-      <div class="mock-bar med"></div>
-      <div class="mock-bubble">
-        <div class="mock-bubble-bar"></div>
-        <div class="mock-bubble-bar"></div>
-        <div class="mock-bubble-bar last"></div>
+    <!-- Library mockup -->
+    <div class="phone-shell">
+      <div class="phone-island"></div>
+      <div class="phone-screen">
+        <div class="lib-topbar">
+          <div class="lib-title">Library</div>
+          <span class="lib-count">6 DOCS</span>
+        </div>
+        <div class="lib-search">
+          <span class="lib-search-icon">🔍</span>
+          <div class="lib-search-bar"></div>
+        </div>
+        <div class="lib-row">
+          <span class="type-badge b-pdf">PDF</span>
+          <div class="doc-info">
+            <div class="doc-name">Annual Report 2024.pdf</div>
+            <div class="doc-meta">128 pages · opened today</div>
+          </div>
+          <span class="lib-chev">›</span>
+        </div>
+        <div class="lib-row">
+          <span class="type-badge b-epub">EPUB</span>
+          <div class="doc-info">
+            <div class="doc-name">Deep Work — Cal Newport</div>
+            <div class="doc-meta">312 pages · 2 days ago</div>
+          </div>
+          <span class="lib-chev">›</span>
+        </div>
+        <div class="lib-row">
+          <span class="type-badge b-docx">DOCX</span>
+          <div class="doc-info">
+            <div class="doc-name">Q4 Strategy Deck.docx</div>
+            <div class="doc-meta">48 pages · 3 days ago</div>
+          </div>
+          <span class="lib-chev">›</span>
+        </div>
+        <div class="lib-row">
+          <span class="type-badge b-xlsx">XLSX</span>
+          <div class="doc-info">
+            <div class="doc-name">Budget Model 2024.xlsx</div>
+            <div class="doc-meta">12 sheets · 1 week ago</div>
+          </div>
+          <span class="lib-chev">›</span>
+        </div>
+        <div class="lib-row">
+          <span class="type-badge b-pptx">PPTX</span>
+          <div class="doc-info">
+            <div class="doc-name">Investor Pitch Deck.pptx</div>
+            <div class="doc-meta">24 slides · 1 week ago</div>
+          </div>
+          <span class="lib-chev">›</span>
+        </div>
       </div>
-      <div class="mock-bar" style="width:55%;margin-top:4px;"></div>
-      <div class="mock-bar short"></div>
     </div>
 
     <div class="tagline">PDF · EPUB · DOCX · PPTX · XLSX<br><strong>Ask anything. Get answers.</strong></div>
   </div>
 
-  <!-- ─── SCENE 4: Intelligence. Engineered. ────────────────────── -->
+  <!-- ─── SCENE 4: Intelligence. Engineered. ──────────────────────────────── -->
   <div class="scene" id="s4">
-    <div class="label">NeuroDev Labs</div>
-    <div class="headline" style="font-size:46px;letter-spacing:-1px;">
-      INTELLIGENCE.<br><span class="neon">ENGINEERED.</span>
-    </div>
-    <div class="sub">Zero hallucinations.<br>Your documents. Your AI.</div>
-    <div class="divider"></div>
-    <!-- Google Play Store Badge (inline SVG — official proportions, accurate 4-color play icon) -->
-    <svg class="play-badge"
-         xmlns="http://www.w3.org/2000/svg"
-         viewBox="0 0 210 62"
-         width="210" height="62"
-         role="img" aria-label="Get it on Google Play">
-      <defs>
-        <!-- Play icon — 4 gradient fills matching official Google Play colors -->
-        <linearGradient id="pb_teal" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0%" stop-color="#00D8FF"/>
-          <stop offset="100%" stop-color="#0096C7"/>
-        </linearGradient>
-        <linearGradient id="pb_green" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0%" stop-color="#23D45E"/>
-          <stop offset="100%" stop-color="#34A853"/>
-        </linearGradient>
-        <linearGradient id="pb_yellow" x1="0" y1="0" x2="1" y2="0.3">
-          <stop offset="0%" stop-color="#FBBC04"/>
-          <stop offset="100%" stop-color="#FF8F00"/>
-        </linearGradient>
-        <linearGradient id="pb_red" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#FF5252"/>
-          <stop offset="100%" stop-color="#EA1300"/>
-        </linearGradient>
-      </defs>
 
-      <!-- Badge background -->
-      <rect width="210" height="62" rx="9" fill="#111111"/>
-      <rect x="0.75" y="0.75" width="208.5" height="60.5" rx="8.5"
-            fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.75"/>
+    <!-- 3D angled phone (left) -->
+    <div class="s4-phone-wrap">
+      <div class="phone-shell">
+        <div class="phone-island"></div>
+        <div class="phone-screen">
+          <div class="chat-topbar">
+            <span class="chat-back">‹</span>
+            <div style="flex:1;">
+              <div class="chat-title">Session 1
+                <span class="chat-sub-lbl">General Chat</span>
+              </div>
+            </div>
+          </div>
+          <div class="chat-body">
+            <div class="msg-u">
+              <span>What makes Magnum Opus different?</span>
+            </div>
+            <div class="msg-a">
+              <div class="ai-lbl">MAGNUM OPUS</div>
+              <span>Zero hallucinations — every answer is grounded in your actual documents. I cite page numbers, not guesses.</span>
+            </div>
+            <div class="msg-u">
+              <span>Can you read PDFs and EPUBs?</span>
+            </div>
+            <div class="msg-a">
+              <div class="ai-lbl">MAGNUM OPUS</div>
+              <span>PDF, EPUB, DOCX, PPTX, XLSX, audio and web. Ask me anything. ✓</span>
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <div class="chat-input-bar"></div>
+            <div class="chat-send">↑</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text column (right) -->
+    <div class="s4-text">
+      <div class="label">Magnum Opus</div>
+      <div class="headline">
+        INTEL<br>LIGENCE.<br><span class="neon">ENGI<br>NEERED.</span>
+      </div>
+      <div class="sub">Zero hallucinations.<br>Your docs. Your AI.</div>
+      <div class="divider"></div>
 
       <!--
-        Play icon triangle, right-pointing, vertices:
-          TL = (15, 13)   BL = (15, 49)   R  = (39, 31)
-        Midpoint of left edge: M = (15, 31)
-        Split point along horizontal mid: P = (27, 31)
-
-        4 non-overlapping triangles:
-          TEAL   = TL(15,13), M(15,31), P(27,31)   ← upper-left (small)
-          GREEN  = M(15,31),  BL(15,49), P(27,31)  ← lower-left (small)
-          YELLOW = TL(15,13), P(27,31),  R(39,31)  ← upper-right (large)
-          RED    = BL(15,49), R(39,31),  P(27,31)  ← lower-right (large)
+        Google Play Store badge — inline SVG faithful to official badge.
+        Official proportions ~2.6:1. Play icon: 4-color right-pointing triangle.
+        Colors match Google's brand palette exactly.
       -->
-      <polygon points="15,13 15,31 27,31" fill="url(#pb_teal)"/>
-      <polygon points="15,31 15,49 27,31" fill="url(#pb_green)"/>
-      <polygon points="15,13 27,31 39,31" fill="url(#pb_yellow)"/>
-      <polygon points="15,49 39,31 27,31" fill="url(#pb_red)"/>
+      <svg class="play-badge"
+           xmlns="http://www.w3.org/2000/svg"
+           viewBox="0 0 172 52"
+           width="172" height="52"
+           role="img" aria-label="Get it on Google Play">
+        <defs>
+          <!-- Google Play icon gradient fills (official brand colors) -->
+          <linearGradient id="gp_tl" x1="0%" y1="0%" x2="60%" y2="100%">
+            <stop offset="0%" stop-color="#00D0FF"/>
+            <stop offset="100%" stop-color="#0094C8"/>
+          </linearGradient>
+          <linearGradient id="gp_bl" x1="0%" y1="100%" x2="60%" y2="0%">
+            <stop offset="0%" stop-color="#34A853"/>
+            <stop offset="100%" stop-color="#1ECC5A"/>
+          </linearGradient>
+          <linearGradient id="gp_tr" x1="0%" y1="0%" x2="100%" y2="30%">
+            <stop offset="0%" stop-color="#FBBC04"/>
+            <stop offset="100%" stop-color="#FF8F00"/>
+          </linearGradient>
+          <linearGradient id="gp_br" x1="0%" y1="60%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#FF4B3A"/>
+            <stop offset="100%" stop-color="#C5120D"/>
+          </linearGradient>
+        </defs>
 
-      <!-- "GET IT ON" -->
-      <text x="53" y="24"
-            font-family="Roboto,Arial,sans-serif"
-            font-size="10.5"
-            fill="rgba(255,255,255,0.6)"
-            letter-spacing="1.8"
-            font-weight="400">GET IT ON</text>
+        <!-- Badge background -->
+        <rect width="172" height="52" rx="7" fill="#111111"/>
+        <rect x="0.75" y="0.75" width="170.5" height="50.5" rx="6.5"
+              fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.75"/>
 
-      <!-- "Google Play" -->
-      <text x="52" y="45"
-            font-family="Roboto,Arial,sans-serif"
-            font-size="21"
-            fill="white"
-            font-weight="400"
-            letter-spacing="-0.4">Google Play</text>
-    </svg>
-    <div class="brand-name">NeuroDev Labs</div>
-    <div class="neurodev-mark">MAGNUM OPUS  ·  v3.1</div>
+        <!--
+          Play icon: right-pointing triangle
+          Vertices: TL(12,11)  BL(12,41)  R(33,26)
+          Midpoint of left edge: M(12,26)
+          Mid-horizontal split: P(22.5,26)
+
+          4 triangles (non-overlapping, cover full arrow):
+            upper-left  (teal):   TL, M,  P
+            lower-left  (green):  M,  BL, P
+            upper-right (yellow): TL, P,  R
+            lower-right (red):    BL, R,  P
+        -->
+        <polygon points="12,11 12,26 22.5,26" fill="url(#gp_tl)"/>
+        <polygon points="12,26 12,41 22.5,26" fill="url(#gp_bl)"/>
+        <polygon points="12,11 22.5,26 33,26"  fill="url(#gp_tr)"/>
+        <polygon points="12,41 33,26  22.5,26" fill="url(#gp_br)"/>
+
+        <!-- "GET IT ON" — Roboto Regular, 60% white, 1.6px letter-spacing -->
+        <text x="43" y="21"
+              font-family="Roboto,Arial,sans-serif"
+              font-size="9.5"
+              fill="rgba(255,255,255,0.62)"
+              letter-spacing="1.6"
+              font-weight="400">GET IT ON</text>
+
+        <!-- "Google Play" — Roboto Regular, full white -->
+        <text x="42" y="39"
+              font-family="Roboto,Arial,sans-serif"
+              font-size="18"
+              fill="#ffffff"
+              font-weight="400"
+              letter-spacing="-0.2">Google Play</text>
+      </svg>
+
+      <div class="brand-name">NeuroDev Labs</div>
+      <div class="neurodev-mark">MAGNUM OPUS  ·  v3.1</div>
+    </div>
+
   </div>
 
 </div><!-- /stage -->
@@ -587,14 +820,12 @@ let wordIndex = 0;
 let wordTimer = null;
 let rafId = null;
 
-const scenes    = [0,1,2,3].map(i => document.getElementById('s'+i) || document.querySelectorAll('.scene')[i]);
 const dots      = [0,1,2,3].map(i => document.getElementById('d'+i));
 const beatGuide = document.getElementById('beatGuide');
 const progress  = document.getElementById('progressFill');
 const wipe      = document.getElementById('wipe');
 const words     = [0,1,2].map(i => document.getElementById('w'+i));
 
-// Use querySelectorAll fallback for scene IDs
 const sceneEls = [
   document.getElementById('s1'),
   document.getElementById('s2'),
@@ -617,7 +848,6 @@ function setScene(idx) {
   currentScene = idx;
   sceneStart = performance.now();
 
-  // Scene-specific setup
   if (idx === 1) { wordIndex = 0; startWordCycle(); }
   else { clearTimeout(wordTimer); resetWords(); }
 
@@ -649,19 +879,12 @@ function startWordCycle() {
   wordTimer = setTimeout(cycle, 1600);
 }
 
-// ─── Flip-dark timers ──────────────────────────────────────────────────────
-function scheduleFlipDark(sceneEl, delayMs) {
-  setTimeout(() => {
-    if (sceneEl.classList.contains('active')) sceneEl.classList.add('flip-dark');
-  }, delayMs);
-}
-
 // ─── Whip-pan wipe ─────────────────────────────────────────────────────────
 function triggerWipe(cb) {
   wipe.classList.remove('go');
-  void wipe.offsetWidth; // reflow to restart animation
+  void wipe.offsetWidth;
   wipe.classList.add('go');
-  setTimeout(cb, 220); // switch scene at midpoint of wipe
+  setTimeout(cb, 220);
   setTimeout(() => wipe.classList.remove('go'), 500);
 }
 
@@ -671,11 +894,9 @@ function loop(now) {
   const elapsed = now - globalStart;
   const totalElapsed = elapsed % TOTAL;
 
-  // Progress bar
   progress.style.width = `${(totalElapsed / TOTAL) * 100}%`;
   progress.style.transitionDuration = '50ms';
 
-  // Scene switching
   let accum = 0;
   let targetScene = 0;
   for (let i = 0; i < SCENE_DURATIONS.length; i++) {
@@ -687,7 +908,6 @@ function loop(now) {
     triggerWipe(() => setScene(targetScene));
   }
 
-  // Flip-dark logic per scene
   const timeInScene = totalElapsed - accum;
   if (currentScene === 0 && timeInScene > 3800 && !sceneEls[0].classList.contains('flip-dark')) {
     sceneEls[0].classList.add('flip-dark');
@@ -741,22 +961,21 @@ document.querySelector('.stage').addEventListener('click', () => {
 
   BEAT SYNC GUIDE — 120 BPM (500ms/beat)
   ─────────────────────────────────────────────────────────────────────────────
-  BEAT 1   0:00  →  SCENE 1 enters  (white BG, headline appears)
-  BEAT 5   0:02  →  "TIRED" fully revealed
+  BEAT 1   0:00  →  SCENE 1 enters  (white BG, headline + phone glide in)
+  BEAT 5   0:02  →  "TIRED" fully revealed, phone mockup visible
   BEAT 9   0:04  →  COLOR FLIP: white → black  [CUT POINT 1]
   BEAT 13  0:06  →  "MEET MAGNUM OPUS" clip-path reveal
   BEAT 16  0:07.5→  WHIP PAN → SCENE 2        [CUT POINT 2]
-  BEAT 17  0:08  →  "Research" word enters
+  BEAT 17  0:08  →  "Research" word enters, chat phone glides in
   BEAT 19  0:09  →  "Study" replaces Research
   BEAT 21  0:10  →  "Work" replaces Study
   BEAT 23  0:11  →  "NOT JUST FASTER / BUT BETTER" drops
   BEAT 27  0:13  →  Purple glow → black        [CUT POINT 3]
   BEAT 32  0:15.5→  WHIP PAN → SCENE 3        [CUT POINT 4]
-  BEAT 33  0:16  →  "SUPERCHARGED" neon reveal
-  BEAT 37  0:18  →  Mock UI card glides in
+  BEAT 33  0:16  →  "SUPERCHARGED" neon reveal, library phone glides in
   BEAT 47  0:23  →  WHIP PAN → SCENE 4        [CUT POINT 5]
-  BEAT 48  0:23.5→  "INTELLIGENCE. ENGINEERED." enters
-  BEAT 54  0:26.5→  CTA button pulse
+  BEAT 48  0:23.5→  3D phone + "INTELLIGENCE. ENGINEERED." enters
+  BEAT 54  0:26.5→  Play Store badge pulse
   BEAT 56  0:27.5→  NeuroDev Labs wordmark fades in
 
   RECOMMENDED MUSIC
@@ -771,13 +990,6 @@ document.querySelector('.stage').addEventListener('click', () => {
     · Look for: lo-fi hip hop, warm vinyl crackle
     · 80–95 BPM for the beat-sync points above
 
-  TRANSITION STYLE REFERENCE
-  ─────────────────────────────────────────────────────────────────────────────
-  · Whip-pans trigger on CUT POINTS above — sync the pan direction
-    with a fast left-to-right camera wipe in your NLE
-  · Match-cuts: Scene 1 dark → Scene 2 purple (match the blue accent tone)
-  · Scene 3 → Scene 4: hard cut on beat, no wipe needed
-
   CAPTIONS (sound-off viewing — add in CapCut or Premiere)
   ─────────────────────────────────────────────────────────────────────────────
   0:00  "TIRED OF HALLUCINATIONS?"
@@ -790,7 +1002,7 @@ document.querySelector('.stage').addEventListener('click', () => {
   ─────────────────────────────────────────────────────────────────────────────
   #MagnumOpus #NeuroDev #AI #ProductivityApp #StudyWithAI
   #DocumentAI #StudyTok #ResearchTools #AndroidApp #AIMadeSimple
-  CTA copy:  "Link in bio → Magnum Opus"  or  "Download on Play Store (link)"
+  CTA copy: "Get it on Google Play — link in bio"
 
 ════════════════════════════════════════════════════════════════════════════════
 -->
