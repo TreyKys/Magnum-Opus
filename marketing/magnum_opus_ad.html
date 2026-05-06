@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magnum Opus — Ad (9:16 · 30s)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200;12..96,400;12..96,700;12..96,800;12..96,900&family=Average&display=swap" rel="stylesheet">
+<style>
+
+/* ─── Reset & Container ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Bricolage Grotesque', sans-serif;
+}
+
+/* 9:16 viewport — design at 390×844 (iPhone 14), scale for preview */
+.stage {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  background: #000;
+  overflow: hidden;
+  border-radius: 40px;
+  box-shadow: 0 0 80px rgba(37,99,235,0.15), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* ─── Base scene ─────────────────────────────────────────────────────────── */
+.scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 48px 36px;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity, transform;
+  transition: opacity 0.6s cubic-bezier(0.25,0.46,0.45,0.94),
+              transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ─── Progress bar ───────────────────────────────────────────────────────── */
+.progress-bar {
+  position: absolute;
+  bottom: 32px;
+  left: 36px;
+  right: 36px;
+  height: 2px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  z-index: 100;
+}
+.progress-fill {
+  height: 100%;
+  background: #2563EB;
+  border-radius: 2px;
+  width: 0%;
+  transition: width linear;
+}
+
+/* ─── Scene dots ─────────────────────────────────────────────────────────── */
+.dots {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 100;
+}
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  transition: background 0.3s, transform 0.3s;
+}
+.dot.active { background: #2563EB; transform: scale(1.4); }
+
+/* ─── Shared text styles ─────────────────────────────────────────────────── */
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #2563EB;
+  margin-bottom: 20px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.5s 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .label { opacity: 1; transform: none; }
+
+.headline {
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1.05;
+  color: #fff;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.6s 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .headline { opacity: 1; transform: none; }
+
+.sub {
+  font-size: 17px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+  margin-top: 16px;
+  line-height: 1.5;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: all 0.5s 0.55s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .sub { opacity: 1; transform: none; }
+
+.neon {
+  color: #3B82F6;
+  text-shadow: 0 0 40px rgba(59,130,246,0.6);
+}
+.neon-green { color: #34D399; text-shadow: 0 0 40px rgba(52,211,153,0.5); }
+.neon-purple { color: #A78BFA; text-shadow: 0 0 40px rgba(167,139,250,0.5); }
+.neon-amber { color: #FBBF24; text-shadow: 0 0 40px rgba(251,191,36,0.5); }
+
+/* ─── CTA pill ───────────────────────────────────────────────────────────── */
+.cta {
+  margin-top: 36px;
+  padding: 14px 32px;
+  border: 1.5px solid rgba(59,130,246,0.6);
+  border-radius: 40px;
+  color: #3B82F6;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(10px) scale(0.97);
+  transition: all 0.5s 0.75s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .cta { opacity: 1; transform: none; }
+
+/* ─── SCENE 1 — Background: White → Black ────────────────────────────────── */
+#s1 {
+  background: #fff;
+  transition: background 1.2s 4s cubic-bezier(0.25,0.46,0.45,0.94),
+              opacity 0.6s cubic-bezier(0.25,0.46,0.45,0.94),
+              transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+#s1.active { background: #fff; }
+#s1.flip-dark { background: #000; }
+
+#s1 .headline { color: #000; }
+#s1.flip-dark .headline { color: #fff; transition: color 0.8s 4.2s; }
+#s1 .sub { color: rgba(0,0,0,0.4); }
+#s1.flip-dark .sub { color: rgba(255,255,255,0.4); transition: color 0.8s 4.2s; }
+#s1 .label { color: #2563EB; }
+
+/* "MEET MAGNUM" reveal on dark */
+#s1 .reveal-dark {
+  position: absolute;
+  bottom: 160px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #3B82F6;
+  text-shadow: 0 0 40px rgba(59,130,246,0.7);
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.8s 5.2s cubic-bezier(0.25,0.46,0.45,0.94),
+              opacity 0.1s 5.2s;
+}
+#s1.flip-dark .reveal-dark { opacity: 1; clip-path: inset(0 0% 0 0); }
+
+/* ─── SCENE 2 — Background: Purple gradient → Black ─────────────────────── */
+#s2 {
+  background: linear-gradient(160deg, #1a0030 0%, #0d0d1a 100%);
+}
+#s2.flip-dark { background: #000; transition: background 1.2s 5.5s cubic-bezier(0.25,0.46,0.45,0.94); }
+
+/* Cycling words: Research / Study / Work */
+.word-cycle {
+  position: relative;
+  height: 72px;
+  overflow: hidden;
+  width: 100%;
+  text-align: center;
+}
+.word {
+  position: absolute;
+  left: 0; right: 0;
+  font-size: 64px;
+  font-weight: 900;
+  line-height: 72px;
+  color: #A78BFA;
+  text-shadow: 0 0 40px rgba(167,139,250,0.5);
+  transform: translateY(72px);
+  opacity: 0;
+  transition: transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94),
+              opacity 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.word.visible { transform: translateY(0); opacity: 1; }
+.word.out { transform: translateY(-72px); opacity: 0; }
+
+.not-just {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  margin-top: 24px;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: all 0.5s 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .not-just { opacity: 1; }
+
+.but-better {
+  font-size: 52px;
+  font-weight: 900;
+  text-align: center;
+  margin-top: 4px;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: all 0.6s 1.6s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .but-better { opacity: 1; transform: none; }
+
+#s2 .reveal-dark {
+  position: absolute;
+  bottom: 150px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #A78BFA;
+  text-shadow: 0 0 40px rgba(167,139,250,0.7);
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.8s 6.2s cubic-bezier(0.25,0.46,0.45,0.94),
+              opacity 0.1s 6.2s;
+}
+#s2.flip-dark .reveal-dark { opacity: 1; clip-path: inset(0 0% 0 0); }
+
+/* ─── SCENE 3 — Your Documents SUPERCHARGED ─────────────────────────────── */
+#s3 { background: #000; }
+
+/* Mock phone UI card */
+.mock-ui {
+  margin-top: 32px;
+  width: 280px;
+  background: #111;
+  border-radius: 20px;
+  border: 1px solid rgba(59,130,246,0.15);
+  padding: 16px;
+  opacity: 0;
+  transform: translateY(20px) scale(0.96);
+  transition: all 0.7s 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
+  box-shadow: 0 0 60px rgba(59,130,246,0.1);
+}
+.scene.active .mock-ui { opacity: 1; transform: none; }
+
+.mock-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  margin-bottom: 8px;
+}
+.mock-bar.blue { background: rgba(59,130,246,0.3); width: 70%; }
+.mock-bar.short { width: 45%; }
+.mock-bar.med { width: 60%; }
+
+.mock-bubble {
+  background: rgba(37,99,235,0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  border-left: 2px solid #2563EB;
+}
+.mock-bubble-bar {
+  height: 7px;
+  border-radius: 3px;
+  background: rgba(59,130,246,0.25);
+  margin-bottom: 5px;
+}
+.mock-bubble-bar.last { width: 65%; margin-bottom: 0; }
+.mock-tag {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #3B82F6;
+  margin-bottom: 8px;
+}
+
+.tagline {
+  margin-top: 28px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: center;
+  color: rgba(255,255,255,0.55);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.5s 1.4s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .tagline { opacity: 1; transform: none; }
+.tagline strong { color: #3B82F6; }
+
+/* ─── SCENE 4 — Intelligence. Engineered. ───────────────────────────────── */
+#s4 { background: #000; }
+
+.brand-name {
+  font-family: 'Average', serif;
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.5);
+  text-align: center;
+  margin-top: 24px;
+  opacity: 0;
+  transition: all 0.6s 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.scene.active .brand-name { opacity: 1; }
+
+.download-btn {
+  margin-top: 40px;
+  padding: 16px 40px;
+  background: #2563EB;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition: all 0.6s 1.6s cubic-bezier(0.25,0.46,0.45,0.94);
+  text-align: center;
+}
+.scene.active .download-btn { opacity: 1; transform: none; }
+
+/* Divider line */
+.divider {
+  width: 40px;
+  height: 1px;
+  background: rgba(255,255,255,0.12);
+  margin: 20px auto;
+  opacity: 0;
+  transition: all 0.4s 1s;
+}
+.scene.active .divider { opacity: 1; }
+
+/* NeuroDev word mark on s4 */
+.neurodev-mark {
+  font-family: 'Average', serif;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  color: rgba(255,255,255,0.2);
+  text-align: center;
+  margin-top: 12px;
+  opacity: 0;
+  transition: all 0.4s 2s;
+}
+.scene.active .neurodev-mark { opacity: 1; }
+
+/* ─── Whip-pan / wipe transition overlay ────────────────────────────────── */
+.wipe {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  z-index: 50;
+  transform: translateX(-110%);
+  will-change: transform;
+  border-radius: 40px;
+}
+.wipe.go {
+  animation: wipePan 0.45s cubic-bezier(0.55,0,1,0.45) forwards;
+}
+@keyframes wipePan {
+  0%   { transform: translateX(-110%); }
+  45%  { transform: translateX(0%); }
+  55%  { transform: translateX(0%); }
+  100% { transform: translateX(110%); }
+}
+
+/* Beat-sync indicator (editor guide, hidden in export) */
+.beat-guide {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.15);
+  letter-spacing: 1px;
+  z-index: 200;
+  font-family: monospace;
+}
+
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <!-- Beat-sync guide for video editor -->
+  <div class="beat-guide" id="beatGuide">SCENE 1 · 0:00</div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+  <!-- Scene dots -->
+  <div class="dots">
+    <div class="dot active" id="d0"></div>
+    <div class="dot" id="d1"></div>
+    <div class="dot" id="d2"></div>
+    <div class="dot" id="d3"></div>
+  </div>
+
+  <!-- Whip-pan wipe overlay -->
+  <div class="wipe" id="wipe"></div>
+
+  <!-- ─── SCENE 1: Tired of Hallucinations? ─────────────────────── -->
+  <div class="scene active" id="s1">
+    <div class="label">The Problem with AI</div>
+    <div class="headline" id="s1h">TIRED OF HALLUCINATIONS?</div>
+    <div class="sub">AI that makes things up<br>is worse than no AI at all.</div>
+    <div class="reveal-dark">MEET MAGNUM OPUS →</div>
+  </div>
+
+  <!-- ─── SCENE 2: Research / Study / Work ──────────────────────── -->
+  <div class="scene" id="s2">
+    <div style="margin-bottom: 16px;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.3);text-align:center;text-transform:uppercase;margin-bottom:10px;">Whether you</div>
+      <div class="word-cycle">
+        <div class="word" id="w0">Research</div>
+        <div class="word" id="w1">Study</div>
+        <div class="word" id="w2">Work</div>
+      </div>
+    </div>
+    <div class="not-just">— not just faster —</div>
+    <div class="but-better">BUT <span class="neon-purple">BETTER.</span></div>
+    <div class="reveal-dark">WITH MAGNUM OPUS →</div>
+  </div>
+
+  <!-- ─── SCENE 3: Your Documents — Supercharged ────────────────── -->
+  <div class="scene" id="s3">
+    <div class="label">Your Documents</div>
+    <div class="headline">SUPER<span class="neon">CHARGED.</span></div>
+
+    <!-- Mock app UI -->
+    <div class="mock-ui">
+      <div class="mock-tag">MAGNUM OPUS · BALANCED DEPTH</div>
+      <div class="mock-bar blue"></div>
+      <div class="mock-bar short"></div>
+      <div class="mock-bar med"></div>
+      <div class="mock-bubble">
+        <div class="mock-bubble-bar"></div>
+        <div class="mock-bubble-bar"></div>
+        <div class="mock-bubble-bar last"></div>
+      </div>
+      <div class="mock-bar" style="width:55%;margin-top:4px;"></div>
+      <div class="mock-bar short"></div>
+    </div>
+
+    <div class="tagline">PDF · EPUB · DOCX · PPTX · XLSX<br><strong>Ask anything. Get answers.</strong></div>
+  </div>
+
+  <!-- ─── SCENE 4: Intelligence. Engineered. ────────────────────── -->
+  <div class="scene" id="s4">
+    <div class="label">NeuroDev Labs</div>
+    <div class="headline" style="font-size:46px;letter-spacing:-1px;">
+      INTELLIGENCE.<br><span class="neon">ENGINEERED.</span>
+    </div>
+    <div class="sub">Zero hallucinations.<br>Your documents. Your AI.</div>
+    <div class="divider"></div>
+    <div class="download-btn">GET MAGNUM OPUS →</div>
+    <div class="brand-name">NeuroDev Labs</div>
+    <div class="neurodev-mark">MAGNUM OPUS  ·  v3.1</div>
+  </div>
+
+</div><!-- /stage -->
+
+<script>
+// ─── Configuration ─────────────────────────────────────────────────────────
+// Scene durations in ms. Total = 30s.
+// S1:7s  S2:9s  S3:7s  S4:7s  = 30s
+const SCENE_DURATIONS = [7000, 9000, 7000, 7000];
+const TOTAL = SCENE_DURATIONS.reduce((a, b) => a + b, 0);
+
+// Beat-sync timestamps (multiples of ~120 BPM / 500ms)
+// These are approximate — align with music in video editor at these ms marks.
+const BEAT_GUIDE = [
+  'SCENE 1 · 0:00  [BEAT 1 — white BG reveal]',
+  'SCENE 1 · 0:04  [BEAT 5 — color flip to black]',
+  'SCENE 1 · 0:06  [BEAT 7 — "MEET MAGNUM" clip-path]',
+  'WIPE    · 0:07  [BEAT 8 — whip pan CUT]',
+  'SCENE 2 · 0:07  [BEAT 8 — word cycle starts]',
+  'SCENE 2 · 0:09  [BEAT 10 — "Research→Study"]',
+  'SCENE 2 · 0:11  [BEAT 12 — "Study→Work"]',
+  'SCENE 2 · 0:13  [BEAT 14 — BUT BETTER drop]',
+  'SCENE 2 · 0:15  [BEAT 16 — purple flip to black]',
+  'WIPE    · 0:16  [BEAT 17 — whip pan CUT]',
+  'SCENE 3 · 0:16  [BEAT 17 — SUPERCHARGED reveal]',
+  'WIPE    · 0:23  [BEAT 25 — whip pan CUT]',
+  'SCENE 4 · 0:23  [BEAT 25 — INTELLIGENCE headline]',
+  'SCENE 4 · 0:27  [BEAT 29 — download CTA pulse]',
+];
+
+// ─── State ─────────────────────────────────────────────────────────────────
+let currentScene = 0;
+let sceneStart = 0;
+let globalStart = 0;
+let wordIndex = 0;
+let wordTimer = null;
+let rafId = null;
+
+const scenes    = [0,1,2,3].map(i => document.getElementById('s'+i) || document.querySelectorAll('.scene')[i]);
+const dots      = [0,1,2,3].map(i => document.getElementById('d'+i));
+const beatGuide = document.getElementById('beatGuide');
+const progress  = document.getElementById('progressFill');
+const wipe      = document.getElementById('wipe');
+const words     = [0,1,2].map(i => document.getElementById('w'+i));
+
+// Use querySelectorAll fallback for scene IDs
+const sceneEls = [
+  document.getElementById('s1'),
+  document.getElementById('s2'),
+  document.getElementById('s3'),
+  document.getElementById('s4'),
+];
+
+// ─── Utility ───────────────────────────────────────────────────────────────
+function ms2time(ms) {
+  const s = Math.floor(ms/1000);
+  return `0:${String(s).padStart(2,'0')}`;
+}
+
+function setScene(idx) {
+  sceneEls.forEach((s,i) => {
+    s.classList.toggle('active', i === idx);
+    s.classList.remove('flip-dark');
+  });
+  dots.forEach((d,i) => d.classList.toggle('active', i === idx));
+  currentScene = idx;
+  sceneStart = performance.now();
+
+  // Scene-specific setup
+  if (idx === 1) { wordIndex = 0; startWordCycle(); }
+  else { clearTimeout(wordTimer); resetWords(); }
+
+  beatGuide.textContent = `SCENE ${idx+1} · ${ms2time(SCENE_DURATIONS.slice(0,idx).reduce((a,b)=>a+b,0))}`;
+}
+
+// ─── Word cycling (Scene 2) ─────────────────────────────────────────────────
+function resetWords() {
+  words.forEach(w => { w.classList.remove('visible','out'); });
+}
+
+function showWord(idx) {
+  words.forEach((w,i) => {
+    w.classList.remove('visible','out');
+    if (i === idx) w.classList.add('visible');
+    else if (i === (idx - 1 + words.length) % words.length) w.classList.add('out');
+  });
+}
+
+function startWordCycle() {
+  resetWords();
+  showWord(0);
+  let wi = 0;
+  function cycle() {
+    wi = (wi + 1) % words.length;
+    showWord(wi);
+    wordTimer = setTimeout(cycle, 1600);
+  }
+  wordTimer = setTimeout(cycle, 1600);
+}
+
+// ─── Flip-dark timers ──────────────────────────────────────────────────────
+function scheduleFlipDark(sceneEl, delayMs) {
+  setTimeout(() => {
+    if (sceneEl.classList.contains('active')) sceneEl.classList.add('flip-dark');
+  }, delayMs);
+}
+
+// ─── Whip-pan wipe ─────────────────────────────────────────────────────────
+function triggerWipe(cb) {
+  wipe.classList.remove('go');
+  void wipe.offsetWidth; // reflow to restart animation
+  wipe.classList.add('go');
+  setTimeout(cb, 220); // switch scene at midpoint of wipe
+  setTimeout(() => wipe.classList.remove('go'), 500);
+}
+
+// ─── Main RAF loop ─────────────────────────────────────────────────────────
+function loop(now) {
+  if (!globalStart) globalStart = now;
+  const elapsed = now - globalStart;
+  const totalElapsed = elapsed % TOTAL;
+
+  // Progress bar
+  progress.style.width = `${(totalElapsed / TOTAL) * 100}%`;
+  progress.style.transitionDuration = '50ms';
+
+  // Scene switching
+  let accum = 0;
+  let targetScene = 0;
+  for (let i = 0; i < SCENE_DURATIONS.length; i++) {
+    if (totalElapsed < accum + SCENE_DURATIONS[i]) { targetScene = i; break; }
+    accum += SCENE_DURATIONS[i];
+  }
+
+  if (targetScene !== currentScene) {
+    triggerWipe(() => setScene(targetScene));
+  }
+
+  // Flip-dark logic per scene
+  const timeInScene = totalElapsed - accum;
+  if (currentScene === 0 && timeInScene > 3800 && !sceneEls[0].classList.contains('flip-dark')) {
+    sceneEls[0].classList.add('flip-dark');
+  }
+  if (currentScene === 1 && timeInScene > 5500 && !sceneEls[1].classList.contains('flip-dark')) {
+    sceneEls[1].classList.add('flip-dark');
+  }
+
+  rafId = requestAnimationFrame(loop);
+}
+
+// ─── Start ─────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setScene(0);
+  rafId = requestAnimationFrame(loop);
+});
+
+// Click to advance manually
+document.querySelector('.stage').addEventListener('click', () => {
+  cancelAnimationFrame(rafId);
+  const next = (currentScene + 1) % 4;
+  triggerWipe(() => setScene(next));
+  globalStart = performance.now() - SCENE_DURATIONS.slice(0,next).reduce((a,b)=>a+b,0);
+  rafId = requestAnimationFrame(loop);
+});
+</script>
+
+<!--
+════════════════════════════════════════════════════════════════════════════════
+  MAGNUM OPUS — MARKETING VIDEO STORYBOARD & PRODUCTION NOTES
+  NeuroDev Labs · v3.1
+════════════════════════════════════════════════════════════════════════════════
+
+  EXPORT SPECS
+  ─────────────────────────────────────────────────────────────────────────────
+  Instagram Reels  →  1080 × 1920px  (9:16)  ·  15–30s  ·  MP4 H.264
+  X / Twitter      →  1280 × 720px  (16:9)  ·  15s max  ·  MP4 H.264
+  TikTok           →  1080 × 1920px  (9:16)  ·  15–30s  ·  MP4 H.264
+
+  HOW TO RECORD
+  ─────────────────────────────────────────────────────────────────────────────
+  1. Open this file in Chrome/Safari at zoom 100%.
+  2. Use a screen recorder (macOS: Cmd+Shift+5 / Loom / OBS) to capture the
+     .stage div at 390×844px.
+  3. Record one full 30-second loop (or click to advance faster for a 15s cut).
+  4. Import to CapCut / DaVinci Resolve / Premiere for:
+       - Music sync (see beat guide below)
+       - Color grade if needed (LUT: cool blue shift)
+       - Caption overlay
+       - Export at target resolution
+
+  BEAT SYNC GUIDE — 120 BPM (500ms/beat)
+  ─────────────────────────────────────────────────────────────────────────────
+  BEAT 1   0:00  →  SCENE 1 enters  (white BG, headline appears)
+  BEAT 5   0:02  →  "TIRED" fully revealed
+  BEAT 9   0:04  →  COLOR FLIP: white → black  [CUT POINT 1]
+  BEAT 13  0:06  →  "MEET MAGNUM OPUS" clip-path reveal
+  BEAT 16  0:07.5→  WHIP PAN → SCENE 2        [CUT POINT 2]
+  BEAT 17  0:08  →  "Research" word enters
+  BEAT 19  0:09  →  "Study" replaces Research
+  BEAT 21  0:10  →  "Work" replaces Study
+  BEAT 23  0:11  →  "NOT JUST FASTER / BUT BETTER" drops
+  BEAT 27  0:13  →  Purple glow → black        [CUT POINT 3]
+  BEAT 32  0:15.5→  WHIP PAN → SCENE 3        [CUT POINT 4]
+  BEAT 33  0:16  →  "SUPERCHARGED" neon reveal
+  BEAT 37  0:18  →  Mock UI card glides in
+  BEAT 47  0:23  →  WHIP PAN → SCENE 4        [CUT POINT 5]
+  BEAT 48  0:23.5→  "INTELLIGENCE. ENGINEERED." enters
+  BEAT 54  0:26.5→  CTA button pulse
+  BEAT 56  0:27.5→  NeuroDev Labs wordmark fades in
+
+  RECOMMENDED MUSIC
+  ─────────────────────────────────────────────────────────────────────────────
+  OPTION A — "Ambient Tech" (Apple blueprint):
+    → pixabay.com/music  ·  Search: "ambient electronic soft synthwave"
+    · Look for: SergePavkinMusic or leberch tracks, 60–90 BPM
+    · Pick one that has a quiet intro (0–3s), gentle swell from beat 5
+
+  OPTION B — "Deep Work Lo-Fi" (Coder's vibe):
+    → mixkit.co/free-stock-music/ambient
+    · Look for: lo-fi hip hop, warm vinyl crackle
+    · 80–95 BPM for the beat-sync points above
+
+  TRANSITION STYLE REFERENCE
+  ─────────────────────────────────────────────────────────────────────────────
+  · Whip-pans trigger on CUT POINTS above — sync the pan direction
+    with a fast left-to-right camera wipe in your NLE
+  · Match-cuts: Scene 1 dark → Scene 2 purple (match the blue accent tone)
+  · Scene 3 → Scene 4: hard cut on beat, no wipe needed
+
+  CAPTIONS (sound-off viewing — add in CapCut or Premiere)
+  ─────────────────────────────────────────────────────────────────────────────
+  0:00  "TIRED OF HALLUCINATIONS?"
+  0:04  "Your AI should work WITH your documents."
+  0:08  "Research · Study · Work — NOT JUST FASTER. BETTER."
+  0:16  "PDF · EPUB · DOCX · PPTX · XLSX — ask anything, get answers."
+  0:23  "Intelligence. Engineered. Download Magnum Opus."
+
+  HASHTAG STRATEGY (X + IG)
+  ─────────────────────────────────────────────────────────────────────────────
+  #MagnumOpus #NeuroDev #AI #ProductivityApp #StudyWithAI
+  #DocumentAI #StudyTok #ResearchTools #AndroidApp #AIMadeSimple
+  CTA copy:  "Link in bio → Magnum Opus"  or  "Download on Play Store (link)"
+
+════════════════════════════════════════════════════════════════════════════════
+-->
+</body>
+</html>

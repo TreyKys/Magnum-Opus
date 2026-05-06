@@ -109,6 +109,21 @@ class SessionMessagesNotifier
       if (attachedDocumentId != null) {
         final contextChunks = await DatabaseHelper.instance
             .getContextRichChunks(attachedDocumentId, text);
+
+        if (contextChunks == 'DOCUMENT_NOT_READY') {
+          final notReady = StandaloneMessage(
+            id: _uuid.v4(),
+            sessionId: sessionId,
+            text: 'This document is still being processed. Please wait a moment and try again.',
+            isUser: false,
+            timestamp: DateTime.now(),
+          );
+          await DatabaseHelper.instance.insertStandaloneMessage(notReady.toMap());
+          state = [...state, notReady];
+          isSending = false;
+          return;
+        }
+
         final skeleton = await DatabaseHelper.instance
             .getDocumentSkeleton(attachedDocumentId);
         aiText = await _ai.generateRAGResponse(

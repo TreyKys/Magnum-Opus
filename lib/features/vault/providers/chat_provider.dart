@@ -59,9 +59,23 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     isThinking = true;
 
     try {
-      // Step 1: Top-15 context fetch from SQLite
+      // Step 1: Context fetch from SQLite
       final contextChunks =
           await DatabaseHelper.instance.getContextRichChunks(arg, query);
+
+      // Document still being processed (audio/URL background ingestion)
+      if (contextChunks == 'DOCUMENT_NOT_READY') {
+        final notReady = ChatMessage(
+          id: _uuid.v4(),
+          documentId: arg,
+          text: 'This document is still being processed. Please wait a moment and try again.',
+          isUser: false,
+          timestamp: DateTime.now(),
+        );
+        await DatabaseHelper.instance.insertChatMessage(notReady.toMap());
+        state = [...state, notReady];
+        return;
+      }
 
       // Step 2: Load global skeleton (macro-context)
       final skeleton = await DatabaseHelper.instance.getDocumentSkeleton(arg);

@@ -111,6 +111,10 @@ CREATE TABLE document_chunks (
   FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
 )
 ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON document_chunks(document_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_chunks_doc_page ON document_chunks(document_id, page_number)');
 
     await db.execute('''
 CREATE TABLE chat_history (
@@ -247,79 +251,118 @@ CREATE TABLE standalone_messages (
     );
   }
 
-  /// Top-15 Semantic Fetch with context overlap.
+  /// BM25-inspired semantic chunk retrieval with distributed fallback.
   ///
-  /// 1. Score every chunk by keyword hit count.
-  /// 2. Take the top-15 highest-scoring chunks.
-  /// 3. For each, include the page immediately before and after (context overlap).
-  /// 4. Deduplicate and return ordered by page number.
+  /// Algorithm:
+  /// 1. Fetch all chunks for the document.
+  /// 2. Score every chunk: exact-phrase bonus (×10) + per-keyword frequency.
+  /// 3. If ≥1 chunk scored > 0: take top-20, expand ±2 pages for context overlap.
+  /// 4. If zero chunks scored (generic "summarise" or "what is this"): return a
+  ///    distributed sample — beginning + middle + end of document — so the AI
+  ///    always has real content to work from rather than an error string.
   Future<String> getContextRichChunks(String documentId, String query) async {
     final db = await instance.database;
 
-    // Extract meaningful keywords (>3 chars)
-    final keywords =
-        query.split(RegExp(r'\s+')).where((w) => w.length > 3).toList();
-
-    if (keywords.isEmpty) {
-      // Fall back to first 3 chunks if no strong keywords
-      final fallback = await db.query(
-        'document_chunks',
-        where: 'document_id = ?',
-        whereArgs: [documentId],
-        orderBy: 'page_number ASC',
-        limit: 3,
-      );
-      if (fallback.isEmpty) return 'No content found in this document.';
-      return fallback
-          .map((r) => '--- Page ${r['page_number']} ---\n${r['extracted_text']}')
-          .join('\n\n');
-    }
-
-    // Score all chunks by keyword frequency
+    // Load all chunks once (indexed on document_id, so this is fast)
     final allChunks = await db.query(
       'document_chunks',
       where: 'document_id = ?',
       whereArgs: [documentId],
+      orderBy: 'page_number ASC',
     );
+    if (allChunks.isEmpty) {
+      return 'DOCUMENT_NOT_READY';
+    }
 
-    final scored = <Map<String, dynamic>>[];
+    // --- Keyword extraction ---
+    // Common English stop-words that add noise without adding signal
+    const _stop = {
+      'a', 'an', 'the', 'is', 'it', 'in', 'on', 'at', 'to', 'for',
+      'of', 'and', 'or', 'but', 'not', 'be', 'do', 'if', 'we', 'my',
+      'me', 'he', 'she', 'us', 'i', 'as', 'by', 'so', 'up', 'no',
+      'was', 'are', 'has', 'had', 'did', 'get', 'got', 'its',
+    };
+    final queryLower = query.toLowerCase();
+    final keywords = query
+        .split(RegExp(r'\s+'))
+        .map((w) => w.toLowerCase().replaceAll(RegExp(r'[^\w]'), ''))
+        .where((w) => w.length >= 2 && !_stop.contains(w))
+        .toSet() // deduplicate
+        .toList();
+
+    // --- Score every chunk ---
+    final scored = <(int score, Map<String, dynamic> chunk)>[];
     for (final chunk in allChunks) {
       final text = (chunk['extracted_text'] as String).toLowerCase();
       int score = 0;
+
+      // Exact-phrase bonus: worth 10 individual keyword hits
+      if (text.contains(queryLower)) score += 10;
+
+      // Per-keyword frequency scoring
       for (final kw in keywords) {
         int idx = 0;
         while (true) {
-          idx = text.indexOf(kw.toLowerCase(), idx);
+          idx = text.indexOf(kw, idx);
           if (idx == -1) break;
           score++;
           idx += kw.length;
         }
       }
-      if (score > 0) {
-        scored.add({...chunk, '_score': score});
+      scored.add((score, chunk));
+    }
+
+    // Check if any chunk matched at all
+    final hasMatches = scored.any((e) => e.$1 > 0);
+
+    if (!hasMatches) {
+      // Generic query (summarise, what is this, etc.) — return a distributed
+      // sample so the AI always has real content to reason over.
+      final n = allChunks.length;
+      final indices = <int>{};
+      // Beginning: first 6 chunks
+      for (int i = 0; i < n && i < 6; i++) indices.add(i);
+      // Middle: 5 chunks around midpoint
+      final mid = n ~/ 2;
+      for (int i = (mid - 2).clamp(0, n - 1);
+          i <= (mid + 2).clamp(0, n - 1);
+          i++) indices.add(i);
+      // End: last 5 chunks
+      for (int i = (n - 5).clamp(0, n - 1); i < n; i++) indices.add(i);
+
+      final sample = (indices.toList()..sort()).map((i) => allChunks[i]).toList();
+      final buf = StringBuffer();
+      for (final row in sample) {
+        buf.writeln('--- Page ${row['page_number']} ---');
+        buf.writeln(row['extracted_text']);
+        buf.writeln();
+      }
+      return buf.toString();
+    }
+
+    // --- Take top-20 matched chunks ---
+    scored.sort((a, b) => b.$1.compareTo(a.$1));
+    final top20 = scored
+        .where((e) => e.$1 > 0)
+        .take(20)
+        .map((e) => e.$2)
+        .toList();
+
+    // --- Expand context: ±2 pages around each matched chunk ---
+    final pageSet = <int>{};
+    for (final chunk in top20) {
+      final page = chunk['page_number'] as int;
+      for (int d = -2; d <= 2; d++) {
+        if (page + d >= 1) pageSet.add(page + d);
       }
     }
 
-    if (scored.isEmpty) return 'No matching content found for this query.';
-
-    // Sort by score descending, take top 15
-    scored.sort((a, b) => (b['_score'] as int).compareTo(a['_score'] as int));
-    final top15 = scored.take(15).toList();
-
-    // Collect page numbers: matched pages + their neighbors
-    final pageSet = <int>{};
-    for (final chunk in top15) {
-      final page = chunk['page_number'] as int;
-      if (page > 1) pageSet.add(page - 1);
-      pageSet.add(page);
-      pageSet.add(page + 1);
-    }
-
-    // Fetch all needed pages in one query
     final pageList = pageSet.toList()..sort();
     final placeholders = pageList.map((_) => '?').join(',');
     final contextChunks = await db.rawQuery(
-      'SELECT * FROM document_chunks WHERE document_id = ? AND page_number IN ($placeholders) ORDER BY page_number ASC',
+      'SELECT * FROM document_chunks '
+      'WHERE document_id = ? AND page_number IN ($placeholders) '
+      'ORDER BY page_number ASC',
       [documentId, ...pageList],
     );
 
