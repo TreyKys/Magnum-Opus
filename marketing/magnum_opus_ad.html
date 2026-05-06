@@ -339,21 +339,16 @@ body {
 }
 .scene.active .brand-name { opacity: 1; }
 
-.download-btn {
+.play-badge {
   margin-top: 40px;
-  padding: 16px 40px;
-  background: #2563EB;
-  border-radius: 14px;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  display: block;
   opacity: 0;
   transform: translateY(12px) scale(0.97);
   transition: all 0.6s 1.6s cubic-bezier(0.25,0.46,0.45,0.94);
-  text-align: center;
+  cursor: pointer;
+  filter: drop-shadow(0 0 18px rgba(59,130,246,0.25));
 }
-.scene.active .download-btn { opacity: 1; transform: none; }
+.scene.active .play-badge { opacity: 1; transform: none; }
 
 /* Divider line */
 .divider {
@@ -488,7 +483,70 @@ body {
     </div>
     <div class="sub">Zero hallucinations.<br>Your documents. Your AI.</div>
     <div class="divider"></div>
-    <div class="download-btn">GET MAGNUM OPUS →</div>
+    <!-- Google Play Store Badge (inline SVG — official proportions, accurate 4-color play icon) -->
+    <svg class="play-badge"
+         xmlns="http://www.w3.org/2000/svg"
+         viewBox="0 0 210 62"
+         width="210" height="62"
+         role="img" aria-label="Get it on Google Play">
+      <defs>
+        <!-- Play icon — 4 gradient fills matching official Google Play colors -->
+        <linearGradient id="pb_teal" x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0%" stop-color="#00D8FF"/>
+          <stop offset="100%" stop-color="#0096C7"/>
+        </linearGradient>
+        <linearGradient id="pb_green" x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0%" stop-color="#23D45E"/>
+          <stop offset="100%" stop-color="#34A853"/>
+        </linearGradient>
+        <linearGradient id="pb_yellow" x1="0" y1="0" x2="1" y2="0.3">
+          <stop offset="0%" stop-color="#FBBC04"/>
+          <stop offset="100%" stop-color="#FF8F00"/>
+        </linearGradient>
+        <linearGradient id="pb_red" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#FF5252"/>
+          <stop offset="100%" stop-color="#EA1300"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Badge background -->
+      <rect width="210" height="62" rx="9" fill="#111111"/>
+      <rect x="0.75" y="0.75" width="208.5" height="60.5" rx="8.5"
+            fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.75"/>
+
+      <!--
+        Play icon triangle, right-pointing, vertices:
+          TL = (15, 13)   BL = (15, 49)   R  = (39, 31)
+        Midpoint of left edge: M = (15, 31)
+        Split point along horizontal mid: P = (27, 31)
+
+        4 non-overlapping triangles:
+          TEAL   = TL(15,13), M(15,31), P(27,31)   ← upper-left (small)
+          GREEN  = M(15,31),  BL(15,49), P(27,31)  ← lower-left (small)
+          YELLOW = TL(15,13), P(27,31),  R(39,31)  ← upper-right (large)
+          RED    = BL(15,49), R(39,31),  P(27,31)  ← lower-right (large)
+      -->
+      <polygon points="15,13 15,31 27,31" fill="url(#pb_teal)"/>
+      <polygon points="15,31 15,49 27,31" fill="url(#pb_green)"/>
+      <polygon points="15,13 27,31 39,31" fill="url(#pb_yellow)"/>
+      <polygon points="15,49 39,31 27,31" fill="url(#pb_red)"/>
+
+      <!-- "GET IT ON" -->
+      <text x="53" y="24"
+            font-family="Roboto,Arial,sans-serif"
+            font-size="10.5"
+            fill="rgba(255,255,255,0.6)"
+            letter-spacing="1.8"
+            font-weight="400">GET IT ON</text>
+
+      <!-- "Google Play" -->
+      <text x="52" y="45"
+            font-family="Roboto,Arial,sans-serif"
+            font-size="21"
+            fill="white"
+            font-weight="400"
+            letter-spacing="-0.4">Google Play</text>
+    </svg>
     <div class="brand-name">NeuroDev Labs</div>
     <div class="neurodev-mark">MAGNUM OPUS  ·  v3.1</div>
   </div>
