@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path/path.dart' as p;
+import 'package:magnum_opus/core/ai/gemini_file_service.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/services/document_extraction_service.dart';
@@ -116,7 +119,6 @@ class VaultNotifier extends Notifier<VaultState> {
       final fileSizeMb =
           await savedFile.length() / (1024 * 1024);
 
-      // We insert the document first (totalPages = 0, will be updated after transcription)
       final docModel = DocumentModel(
         id: id,
         title: fileName,
@@ -128,15 +130,12 @@ class VaultNotifier extends Notifier<VaultState> {
       );
       await DatabaseHelper.instance.insertDocument(docModel);
 
-      // Mark as indexing ("Transcribing...")
       final indexingSet = Set<String>.from(state.indexingDocumentIds)..add(id);
       final updatedDocs = await DatabaseHelper.instance.getAllDocuments();
       state = state.copyWith(
           documents: updatedDocs, indexingDocumentIds: indexingSet);
 
-      // Transcribe and chunk in background
       AudioIngestionService.transcribeAndChunk(savedFile.path, id).then((chunkCount) async {
-        // Update totalPages to chunk count
         final db = await DatabaseHelper.instance.database;
         await db.update(
           'documents',
@@ -144,9 +143,7 @@ class VaultNotifier extends Notifier<VaultState> {
           where: 'id = ?',
           whereArgs: [id],
         );
-        // Generate skeleton
         await DocumentExtractionService.generateSkeletonForDocument(id);
-        // Remove from indexing
         final newSet = Set<String>.from(state.indexingDocumentIds)..remove(id);
         final refreshed = await DatabaseHelper.instance.getAllDocuments();
         state = state.copyWith(documents: refreshed, indexingDocumentIds: newSet);
@@ -167,7 +164,7 @@ class VaultNotifier extends Notifier<VaultState> {
       final docModel = DocumentModel(
         id: id,
         title: title,
-        filePath: url, // filePath stores the URL for web documents
+        filePath: url,
         fileSizeMb: 0,
         totalPages: 0,
         lastAccessed: DateTime.now(),
@@ -214,15 +211,23 @@ class VaultNotifier extends Notifier<VaultState> {
 
     int totalPages = 0;
     if (fileType == 'pdf') {
-      PdfDocument? doc;
+      // Run PdfDocument on an isolate to avoid blocking the main thread
       try {
-        doc = PdfDocument(inputBytes: bytes);
-        totalPages = doc.pages.count;
-      } catch (_) {} finally {
-        doc?.dispose();
+        totalPages = await Isolate.run(() {
+          PdfDocument? doc;
+          try {
+            doc = PdfDocument(inputBytes: bytes);
+            return doc.pages.count;
+          } catch (_) {
+            return 0;
+          } finally {
+            doc?.dispose();
+          }
+        });
+      } catch (_) {
+        totalPages = 0;
       }
     }
-    // For non-PDF types, totalPages will be updated after extraction completes
 
     final docModel = DocumentModel(
       id: id,
@@ -237,7 +242,65 @@ class VaultNotifier extends Notifier<VaultState> {
     await DatabaseHelper.instance.insertDocument(docModel);
     final updatedDocs = await DatabaseHelper.instance.getAllDocuments();
     state = state.copyWith(documents: updatedDocs);
-    _startExtraction(docModel);
+
+    if (fileType == 'pdf' && totalPages > 0) {
+      _routePdfDivision(docModel, bytes, totalPages);
+    } else {
+      _startExtraction(docModel);
+    }
+  }
+
+  // ─── Division System ─────────────────────────────────────────────────────
+
+  void _routePdfDivision(DocumentModel doc, Uint8List bytes, int totalPages) {
+    final indexingSet = Set<String>.from(state.indexingDocumentIds)
+      ..add(doc.id);
+    state = state.copyWith(indexingDocumentIds: indexingSet);
+
+    _runPdfDivision(doc, bytes, totalPages).catchError((_) {
+      // File API failed — chunks were extracted via extractDocument, doc is still usable
+      final newSet = Set<String>.from(state.indexingDocumentIds)
+        ..remove(doc.id);
+      DatabaseHelper.instance.getAllDocuments().then((docs) {
+        state = state.copyWith(documents: docs, indexingDocumentIds: newSet);
+      });
+    });
+  }
+
+  Future<void> _runPdfDivision(
+      DocumentModel doc, Uint8List bytes, int totalPages) async {
+    // Step 1: Extract ALL pages as chunks (BM25 fallback + skeleton)
+    await DocumentExtractionService.extractDocument(doc, (_) {});
+
+    // Step 2: Select brain pages and upload to Gemini File API
+    if (totalPages <= 50) {
+      // Pipeline A: entire PDF is the brain
+      final fileUri =
+          await GeminiFileService.uploadPdfWithRetry(bytes, doc.title);
+      await DatabaseHelper.instance
+          .updateDocumentFileUri(doc.id, fileUri, DateTime.now());
+      // For Pipeline A, all pages are in the File API — no brainPages stored
+    } else {
+      // Pipeline B: top 50 content-dense pages are the brain
+      final topPages = await DatabaseHelper.instance
+          .getTopContentPages(doc.id, limit: 50);
+      if (topPages.isNotEmpty) {
+        final brainBytes =
+            await GeminiFileService.extractSpecificPages(bytes, topPages);
+        final fileUri = await GeminiFileService.uploadPdfWithRetry(
+            brainBytes, '${doc.title} [Core]');
+        await DatabaseHelper.instance
+            .updateDocumentFileUri(doc.id, fileUri, DateTime.now());
+        await DatabaseHelper.instance
+            .updateDocumentBrainPages(doc.id, topPages);
+      }
+    }
+
+    final newSet = Set<String>.from(state.indexingDocumentIds)
+      ..remove(doc.id);
+    final refreshed = await DatabaseHelper.instance.getAllDocuments();
+    state = state.copyWith(
+        documents: refreshed, indexingDocumentIds: newSet);
   }
 
   // ─── Delete ──────────────────────────────────────────────────────────────
@@ -245,7 +308,6 @@ class VaultNotifier extends Notifier<VaultState> {
   Future<void> deleteDocument(String id, String filePath) async {
     try {
       await DatabaseHelper.instance.deleteDocument(id);
-      // Only delete physical file if it's not a URL
       if (!filePath.startsWith('http')) {
         final file = File(filePath);
         if (await file.exists()) await file.delete();

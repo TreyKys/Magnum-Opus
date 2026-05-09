@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/ai/ai_service.dart';
+import 'package:magnum_opus/core/ai/gemini_file_service.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
 
 final chatProvider = NotifierProvider.autoDispose
     .family<ChatNotifier, List<ChatMessage>, String>(
@@ -32,7 +35,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
   Future<void> clearChat() async {
     await DatabaseHelper.instance.clearChatHistory(arg);
-    await _loadMessages(); // Reload — pinned messages survive
+    await _loadMessages();
   }
 
   Future<void> togglePin(String messageId, bool isPinned) async {
@@ -46,7 +49,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   Future<void> sendMessage(String query, {Uint8List? imageBytes}) async {
     if (query.trim().isEmpty) return;
 
-    // Record and display user message immediately
     final userMessage = ChatMessage(
       id: _uuid.v4(),
       documentId: arg,
@@ -59,61 +61,157 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     isThinking = true;
 
     try {
-      // Step 1: Context fetch from SQLite
-      final contextChunks =
-          await DatabaseHelper.instance.getContextRichChunks(arg, query);
+      final doc = await DatabaseHelper.instance.getDocumentById(arg);
+      final complexity = ref.read(complexityProvider);
+      final skeleton = await DatabaseHelper.instance.getDocumentSkeleton(arg);
+      final history = state.where((m) => m.id != userMessage.id).toList();
 
-      // Document still being processed (audio/URL background ingestion)
-      if (contextChunks == 'DOCUMENT_NOT_READY') {
-        final notReady = ChatMessage(
-          id: _uuid.v4(),
-          documentId: arg,
-          text: 'This document is still being processed. Please wait a moment and try again.',
-          isUser: false,
-          timestamp: DateTime.now(),
+      final bool isPdf = doc?.fileType == 'pdf';
+      final String? fileUri = doc?.fileUri;
+      final bool hasFileUri = fileUri != null && fileUri.isNotEmpty;
+
+      String response;
+
+      if (isPdf && hasFileUri) {
+        final uploadedAt = doc!.fileUriUploadedAt;
+        final bool isExpired = uploadedAt == null ||
+            DateTime.now().difference(uploadedAt).inHours >= 47;
+
+        if (isExpired) {
+          // Trigger background re-sync; fall back to BM25 for this query
+          _triggerBackgroundResync(doc);
+
+          final notice = ChatMessage(
+            id: _uuid.v4(),
+            documentId: arg,
+            text: 'Re-syncing document with AI — using cached excerpts for this query. '
+                'Future queries will use the full document.',
+            isUser: false,
+            timestamp: DateTime.now(),
+          );
+          await DatabaseHelper.instance.insertChatMessage(notice.toMap());
+          state = [...state, notice];
+
+          final chunks = await DatabaseHelper.instance
+              .getContextRichChunks(arg, query);
+          if (chunks == 'DOCUMENT_NOT_READY') {
+            await _appendNotReady();
+            return;
+          }
+          response = await _aiService.generateRAGResponse(
+            contextChunks: chunks,
+            userQuery: query,
+            history: history,
+            imageBytes: imageBytes,
+            complexity: complexity,
+            documentSkeleton: skeleton,
+          );
+        } else {
+          // Valid File API path
+          String? archiveChunks;
+          if (doc.totalPages > 50) {
+            final brainPages = doc.brainPages ?? [];
+            final archive = await DatabaseHelper.instance
+                .getContextRichChunks(arg, query, excludePages: brainPages);
+            archiveChunks =
+                archive == 'DOCUMENT_NOT_READY' ? null : archive;
+          }
+          response = await _aiService.generateRAGResponse(
+            contextChunks: '',
+            userQuery: query,
+            history: history,
+            imageBytes: imageBytes,
+            complexity: complexity,
+            documentSkeleton: skeleton,
+            fileUri: fileUri,
+            archiveChunks: archiveChunks,
+          );
+        }
+      } else {
+        // BM25 path (non-PDF or no fileUri)
+        final chunks = await DatabaseHelper.instance
+            .getContextRichChunks(arg, query);
+        if (chunks == 'DOCUMENT_NOT_READY') {
+          await _appendNotReady();
+          return;
+        }
+        response = await _aiService.generateRAGResponse(
+          contextChunks: chunks,
+          userQuery: query,
+          history: history,
+          imageBytes: imageBytes,
+          complexity: complexity,
+          documentSkeleton: skeleton,
         );
-        await DatabaseHelper.instance.insertChatMessage(notReady.toMap());
-        state = [...state, notReady];
-        return;
       }
 
-      // Step 2: Load global skeleton (macro-context)
-      final skeleton = await DatabaseHelper.instance.getDocumentSkeleton(arg);
-
-      // Step 3: Read current complexity level
-      final complexity = ref.read(complexityProvider);
-
-      // Step 4: Send to Gemini with full context
-      final response = await _aiService.generateRAGResponse(
-        contextChunks: contextChunks,
-        userQuery: query,
-        history: state.where((msg) => msg.id != userMessage.id).toList(),
-        imageBytes: imageBytes,
-        complexity: complexity,
-        documentSkeleton: skeleton,
-      );
-
-      // Step 5: Record and display AI response
-      final aiMessage = ChatMessage(
-        id: _uuid.v4(),
-        documentId: arg,
-        text: response,
-        isUser: false,
-        timestamp: DateTime.now(),
-      );
-      await DatabaseHelper.instance.insertChatMessage(aiMessage.toMap());
-      state = [...state, aiMessage];
+      await _appendAiMessage(response);
     } catch (e) {
-      final errorMessage = ChatMessage(
+      await _appendError();
+    } finally {
+      isThinking = false;
+    }
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  Future<void> _appendAiMessage(String text) async {
+    final msg = ChatMessage(
+      id: _uuid.v4(),
+      documentId: arg,
+      text: text,
+      isUser: false,
+      timestamp: DateTime.now(),
+    );
+    await DatabaseHelper.instance.insertChatMessage(msg.toMap());
+    state = [...state, msg];
+  }
+
+  Future<void> _appendNotReady() async {
+    const text =
+        'This document is still being processed. Please wait a moment and try again.';
+    final msg = ChatMessage(
+      id: _uuid.v4(),
+      documentId: arg,
+      text: text,
+      isUser: false,
+      timestamp: DateTime.now(),
+    );
+    await DatabaseHelper.instance.insertChatMessage(msg.toMap());
+    state = [...state, msg];
+  }
+
+  Future<void> _appendError() async {
+    state = [
+      ...state,
+      ChatMessage(
         id: _uuid.v4(),
         documentId: arg,
         text: 'Something went wrong. Please try again.',
         isUser: false,
         timestamp: DateTime.now(),
-      );
-      state = [...state, errorMessage];
-    } finally {
-      isThinking = false;
-    }
+      ),
+    ];
+  }
+
+  /// Re-uploads the PDF brain in the background and updates the stored fileUri.
+  void _triggerBackgroundResync(DocumentModel doc) {
+    Future(() async {
+      final bytes = await File(doc.filePath).readAsBytes();
+      final Uint8List uploadBytes;
+      final brainPages = doc.brainPages;
+      if (doc.totalPages > 50 && brainPages != null && brainPages.isNotEmpty) {
+        uploadBytes =
+            await GeminiFileService.extractSpecificPages(bytes, brainPages);
+      } else {
+        uploadBytes = bytes;
+      }
+      final newUri =
+          await GeminiFileService.uploadPdfWithRetry(uploadBytes, doc.title);
+      await DatabaseHelper.instance
+          .updateDocumentFileUri(doc.id, newUri, DateTime.now());
+    }).catchError((_) {
+      // Silent — next query will retry
+    });
   }
 }

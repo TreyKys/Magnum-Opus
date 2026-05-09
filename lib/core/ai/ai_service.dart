@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -14,17 +15,20 @@ class AiService {
     _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
   }
 
-  // ─── Retry with exponential backoff ──────────────────────────────────────────
+  // ─── Retry with exponential backoff + jitter ──────────────────────────────
 
   Future<T> _withRetry<T>(Future<T> Function() fn, {int maxAttempts = 3}) async {
     Object? lastError;
+    final rng = math.Random();
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         return await fn();
       } catch (e) {
         lastError = e;
         if (!_isRetryable(e) || attempt == maxAttempts - 1) rethrow;
-        await Future.delayed(Duration(seconds: 1 << attempt)); // 1s, 2s, 4s
+        final jitter = rng.nextInt(500);
+        await Future.delayed(
+            Duration(milliseconds: ((1 << attempt) * 1000) + jitter));
       }
     }
     throw lastError!;
@@ -96,6 +100,8 @@ class AiService {
     Uint8List? imageBytes,
     int complexity = 50,
     String? documentSkeleton,
+    String? fileUri,        // Gemini File API URI (PDF brain)
+    String? archiveChunks, // BM25 chunks for non-brain pages (Pipeline B)
   }) async {
     final complexityBlock = _complexityInstruction(complexity);
 
@@ -122,7 +128,25 @@ Citation Mandate: Always end your response with a "Sources" section listing the 
 
 Precision Mandate: Prioritise structural accuracy and logical flow across all advanced domains including but not limited to: smart contracts, pharmacokinetics, cybersecurity, algorithmic trading, cryptography, quantum mechanics, constitutional law, ML/neural networks, aerospace, biochemistry, civil engineering, genomics, macroeconomics, distributed systems, thermodynamics, tax law, materials science, medical imaging, renewable energy, actuarial science, epidemiology, organic chemistry, HFT, nanotechnology, paleontology, telecom, urban planning, quantum computing, veterinary pathology, agronomy, behavioural statistics, microprocessor architecture, oceanography, linguistics, SMC/liquidity mechanics, AI alignment, advanced calculus.''';
 
-    final prompt = '''
+    final bool hasFileUri = fileUri != null && fileUri.isNotEmpty;
+
+    final String prompt;
+    if (hasFileUri) {
+      final archiveSection =
+          (archiveChunks != null && archiveChunks.isNotEmpty)
+              ? '\nEXTENDED ARCHIVE (supplementary pages not in the core brain):\n$archiveChunks\n\n---\n'
+              : '';
+      prompt = '''
+$systemInstruction
+
+---
+${skeletonBlock}The primary document is provided as an attached PDF. Answer based on the full document content.
+$archiveSection
+USER QUERY:
+$userQuery
+''';
+    } else {
+      prompt = '''
 $systemInstruction
 
 ---
@@ -133,6 +157,7 @@ $contextChunks
 USER QUERY:
 $userQuery
 ''';
+    }
 
     try {
       return await _withRetry(() async {
@@ -147,7 +172,13 @@ $userQuery
         }
 
         Content newestContent;
-        if (imageBytes != null) {
+        if (hasFileUri) {
+          newestContent = Content.multi([
+            FileData('application/pdf', fileUri!),
+            TextPart(prompt),
+            if (imageBytes != null) DataPart('image/png', imageBytes),
+          ]);
+        } else if (imageBytes != null) {
           newestContent = Content.multi([
             TextPart(prompt),
             DataPart('image/png', imageBytes),

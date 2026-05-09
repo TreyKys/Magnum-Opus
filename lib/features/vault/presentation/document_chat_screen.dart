@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
@@ -301,7 +302,53 @@ class _MessageBubble extends ConsumerWidget {
               child: MarkdownWidget(
                 data: parsed.body,
                 shrinkWrap: true,
-                config: MarkdownConfig.darkConfig,
+                config: MarkdownConfig(configs: [
+                  PConfig(
+                    textStyle: GoogleFonts.bricolageGrotesque(
+                      fontSize: 15,
+                      color: Colors.white.withOpacity(0.88),
+                      height: 1.65,
+                    ),
+                  ),
+                  H1Config(
+                    textStyle: GoogleFonts.bricolageGrotesque(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.4,
+                    ),
+                  ),
+                  H2Config(
+                    textStyle: GoogleFonts.bricolageGrotesque(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: 1.4,
+                    ),
+                  ),
+                  H3Config(
+                    textStyle: GoogleFonts.bricolageGrotesque(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: 1.4,
+                    ),
+                  ),
+                  PreConfig(
+                    textStyle: const TextStyle(fontSize: 13, height: 1.5),
+                  ),
+                  CodeConfig(
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF82AAFF),
+                      backgroundColor: Color(0xFF1E1E2E),
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                  BlockquoteConfig(
+                    textColor: const Color(0xFFB3B3B3),
+                  ),
+                ]),
               ),
             ),
             for (final src in parsed.sources) _SourceChip(text: src),

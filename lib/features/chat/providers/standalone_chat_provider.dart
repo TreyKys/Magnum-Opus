@@ -1,12 +1,15 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:magnum_opus/core/ai/ai_service.dart';
+import 'package:magnum_opus/core/ai/gemini_file_service.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/chat/models/chat_session_model.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +77,6 @@ class SessionMessagesNotifier
     await DatabaseHelper.instance.insertStandaloneMessage(userMsg.toMap());
     state = [...state, userMsg];
 
-    // Update session last_message_at
     await DatabaseHelper.instance.updateStandaloneSession(sessionId, {
       'last_message_at': userMsg.timestamp.toIso8601String(),
     });
@@ -106,35 +108,93 @@ class SessionMessagesNotifier
           .toList();
 
       String aiText;
+
       if (attachedDocumentId != null) {
-        final contextChunks = await DatabaseHelper.instance
-            .getContextRichChunks(attachedDocumentId, text);
-
-        if (contextChunks == 'DOCUMENT_NOT_READY') {
-          final notReady = StandaloneMessage(
-            id: _uuid.v4(),
-            sessionId: sessionId,
-            text: 'This document is still being processed. Please wait a moment and try again.',
-            isUser: false,
-            timestamp: DateTime.now(),
-          );
-          await DatabaseHelper.instance.insertStandaloneMessage(notReady.toMap());
-          state = [...state, notReady];
-          isSending = false;
-          return;
-        }
-
+        final doc = await DatabaseHelper.instance
+            .getDocumentById(attachedDocumentId);
         final skeleton = await DatabaseHelper.instance
             .getDocumentSkeleton(attachedDocumentId);
-        aiText = await _ai.generateRAGResponse(
-          contextChunks: contextChunks,
-          userQuery: text,
-          history: history,
-          imageBytes: imageBytes,
-          complexity: complexity,
-          documentSkeleton: skeleton,
-        );
+
+        final bool isPdf = doc?.fileType == 'pdf';
+        final String? fileUri = doc?.fileUri;
+        final bool hasFileUri = fileUri != null && fileUri.isNotEmpty;
+
+        if (isPdf && hasFileUri) {
+          final uploadedAt = doc!.fileUriUploadedAt;
+          final bool isExpired = uploadedAt == null ||
+              DateTime.now().difference(uploadedAt).inHours >= 47;
+
+          if (isExpired) {
+            _triggerBackgroundResync(doc);
+
+            final resyncNotice = StandaloneMessage(
+              id: _uuid.v4(),
+              sessionId: sessionId,
+              text: 'Re-syncing document with AI — using cached excerpts for this query.',
+              isUser: false,
+              timestamp: DateTime.now(),
+            );
+            await DatabaseHelper.instance
+                .insertStandaloneMessage(resyncNotice.toMap());
+            state = [...state, resyncNotice];
+
+            final contextChunks = await DatabaseHelper.instance
+                .getContextRichChunks(attachedDocumentId, text);
+            if (contextChunks == 'DOCUMENT_NOT_READY') {
+              await _appendNotReady();
+              isSending = false;
+              return;
+            }
+            aiText = await _ai.generateRAGResponse(
+              contextChunks: contextChunks,
+              userQuery: text,
+              history: history,
+              imageBytes: imageBytes,
+              complexity: complexity,
+              documentSkeleton: skeleton,
+            );
+          } else {
+            // Valid File API path
+            String? archiveChunks;
+            if (doc.totalPages > 50) {
+              final brainPages = doc.brainPages ?? [];
+              final archive = await DatabaseHelper.instance
+                  .getContextRichChunks(attachedDocumentId, text,
+                      excludePages: brainPages);
+              archiveChunks =
+                  archive == 'DOCUMENT_NOT_READY' ? null : archive;
+            }
+            aiText = await _ai.generateRAGResponse(
+              contextChunks: '',
+              userQuery: text,
+              history: history,
+              imageBytes: imageBytes,
+              complexity: complexity,
+              documentSkeleton: skeleton,
+              fileUri: fileUri,
+              archiveChunks: archiveChunks,
+            );
+          }
+        } else {
+          // BM25 path (non-PDF or no fileUri)
+          final contextChunks = await DatabaseHelper.instance
+              .getContextRichChunks(attachedDocumentId, text);
+          if (contextChunks == 'DOCUMENT_NOT_READY') {
+            await _appendNotReady();
+            isSending = false;
+            return;
+          }
+          aiText = await _ai.generateRAGResponse(
+            contextChunks: contextChunks,
+            userQuery: text,
+            history: history,
+            imageBytes: imageBytes,
+            complexity: complexity,
+            documentSkeleton: skeleton,
+          );
+        }
       } else {
+        // No document attached — general chat
         aiText = await _ai.generalChat(
           query: text,
           history: history,
@@ -159,7 +219,7 @@ class SessionMessagesNotifier
       final errMsg = StandaloneMessage(
         id: _uuid.v4(),
         sessionId: sessionId,
-        text: 'Error: $e',
+        text: 'Something went wrong. Please try again.',
         isUser: false,
         timestamp: DateTime.now(),
       );
@@ -168,6 +228,38 @@ class SessionMessagesNotifier
     } finally {
       isSending = false;
     }
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  Future<void> _appendNotReady() async {
+    final msg = StandaloneMessage(
+      id: _uuid.v4(),
+      sessionId: sessionId,
+      text: 'This document is still being processed. Please wait a moment and try again.',
+      isUser: false,
+      timestamp: DateTime.now(),
+    );
+    await DatabaseHelper.instance.insertStandaloneMessage(msg.toMap());
+    state = [...state, msg];
+  }
+
+  void _triggerBackgroundResync(DocumentModel doc) {
+    Future(() async {
+      final bytes = await File(doc.filePath).readAsBytes();
+      final Uint8List uploadBytes;
+      final brainPages = doc.brainPages;
+      if (doc.totalPages > 50 && brainPages != null && brainPages.isNotEmpty) {
+        uploadBytes =
+            await GeminiFileService.extractSpecificPages(bytes, brainPages);
+      } else {
+        uploadBytes = bytes;
+      }
+      final newUri =
+          await GeminiFileService.uploadPdfWithRetry(uploadBytes, doc.title);
+      await DatabaseHelper.instance
+          .updateDocumentFileUri(doc.id, newUri, DateTime.now());
+    }).catchError((_) {});
   }
 }
 

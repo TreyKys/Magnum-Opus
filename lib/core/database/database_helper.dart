@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
@@ -20,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -86,6 +87,11 @@ CREATE TABLE standalone_messages (
 )
 ''');
     }
+    if (oldVersion < 6) {
+      await db.execute("ALTER TABLE documents ADD COLUMN file_uri TEXT");
+      await db.execute("ALTER TABLE documents ADD COLUMN file_uri_uploaded_at TEXT");
+      await db.execute("ALTER TABLE documents ADD COLUMN brain_pages TEXT");
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -98,7 +104,10 @@ CREATE TABLE documents (
   total_pages INTEGER NOT NULL,
   last_accessed TEXT NOT NULL,
   file_type TEXT NOT NULL DEFAULT 'pdf',
-  skeleton TEXT
+  skeleton TEXT,
+  file_uri TEXT,
+  file_uri_uploaded_at TEXT,
+  brain_pages TEXT
 )
 ''');
 
@@ -173,6 +182,18 @@ CREATE TABLE standalone_messages (
     return result.map((json) => DocumentModel.fromMap(json)).toList();
   }
 
+  Future<DocumentModel?> getDocumentById(String id) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'documents',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (result.isEmpty) return null;
+    return DocumentModel.fromMap(result.first);
+  }
+
   Future<void> deleteDocument(String id) async {
     final db = await instance.database;
     // Cascade via FK handles document_chunks and chat_history
@@ -209,6 +230,30 @@ CREATE TABLE standalone_messages (
     );
     if (result.isEmpty) return null;
     return result.first['skeleton'] as String?;
+  }
+
+  Future<void> updateDocumentFileUri(
+      String id, String? fileUri, DateTime? uploadedAt) async {
+    final db = await instance.database;
+    await db.update(
+      'documents',
+      {
+        'file_uri': fileUri,
+        'file_uri_uploaded_at': uploadedAt?.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> updateDocumentBrainPages(String id, List<int> pages) async {
+    final db = await instance.database;
+    await db.update(
+      'documents',
+      {'brain_pages': jsonEncode(pages)},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   // ─── Chunks ───────────────────────────────────────────────────────────────
@@ -251,23 +296,41 @@ CREATE TABLE standalone_messages (
     );
   }
 
+  /// Returns page numbers of the top [limit] content-dense chunks (by character count).
+  /// Used to identify brain pages for the Division System.
+  Future<List<int>> getTopContentPages(String documentId,
+      {int limit = 50}) async {
+    final db = await instance.database;
+    final result = await db.rawQuery('''
+      SELECT page_number
+      FROM document_chunks
+      WHERE document_id = ?
+      ORDER BY LENGTH(extracted_text) DESC
+      LIMIT ?
+    ''', [documentId, limit]);
+    return result.map((r) => r['page_number'] as int).toList();
+  }
+
   /// BM25-inspired semantic chunk retrieval with distributed fallback.
   ///
-  /// Algorithm:
-  /// 1. Fetch all chunks for the document.
-  /// 2. Score every chunk: exact-phrase bonus (×10) + per-keyword frequency.
-  /// 3. If ≥1 chunk scored > 0: take top-20, expand ±2 pages for context overlap.
-  /// 4. If zero chunks scored (generic "summarise" or "what is this"): return a
-  ///    distributed sample — beginning + middle + end of document — so the AI
-  ///    always has real content to work from rather than an error string.
-  Future<String> getContextRichChunks(String documentId, String query) async {
+  /// [excludePages]: page numbers to skip (brain pages already covered by File API).
+  Future<String> getContextRichChunks(String documentId, String query,
+      {List<int>? excludePages}) async {
     final db = await instance.database;
 
-    // Load all chunks once (indexed on document_id, so this is fast)
+    // Build WHERE clause — optionally exclude brain pages
+    String where = 'document_id = ?';
+    final args = <dynamic>[documentId];
+    if (excludePages != null && excludePages.isNotEmpty) {
+      final ph = excludePages.map((_) => '?').join(',');
+      where += ' AND page_number NOT IN ($ph)';
+      args.addAll(excludePages);
+    }
+
     final allChunks = await db.query(
       'document_chunks',
-      where: 'document_id = ?',
-      whereArgs: [documentId],
+      where: where,
+      whereArgs: args,
       orderBy: 'page_number ASC',
     );
     if (allChunks.isEmpty) {
@@ -275,8 +338,7 @@ CREATE TABLE standalone_messages (
     }
 
     // --- Keyword extraction ---
-    // Common English stop-words that add noise without adding signal
-    const _stop = {
+    const stopWords = {
       'a', 'an', 'the', 'is', 'it', 'in', 'on', 'at', 'to', 'for',
       'of', 'and', 'or', 'but', 'not', 'be', 'do', 'if', 'we', 'my',
       'me', 'he', 'she', 'us', 'i', 'as', 'by', 'so', 'up', 'no',
@@ -286,8 +348,8 @@ CREATE TABLE standalone_messages (
     final keywords = query
         .split(RegExp(r'\s+'))
         .map((w) => w.toLowerCase().replaceAll(RegExp(r'[^\w]'), ''))
-        .where((w) => w.length >= 2 && !_stop.contains(w))
-        .toSet() // deduplicate
+        .where((w) => w.length >= 2 && !stopWords.contains(w))
+        .toSet()
         .toList();
 
     // --- Score every chunk ---
@@ -296,10 +358,8 @@ CREATE TABLE standalone_messages (
       final text = (chunk['extracted_text'] as String).toLowerCase();
       int score = 0;
 
-      // Exact-phrase bonus: worth 10 individual keyword hits
       if (text.contains(queryLower)) score += 10;
 
-      // Per-keyword frequency scoring
       for (final kw in keywords) {
         int idx = 0;
         while (true) {
@@ -312,22 +372,17 @@ CREATE TABLE standalone_messages (
       scored.add((score, chunk));
     }
 
-    // Check if any chunk matched at all
     final hasMatches = scored.any((e) => e.$1 > 0);
 
     if (!hasMatches) {
-      // Generic query (summarise, what is this, etc.) — return a distributed
-      // sample so the AI always has real content to reason over.
+      // Generic query — return distributed sample
       final n = allChunks.length;
       final indices = <int>{};
-      // Beginning: first 6 chunks
       for (int i = 0; i < n && i < 6; i++) indices.add(i);
-      // Middle: 5 chunks around midpoint
       final mid = n ~/ 2;
       for (int i = (mid - 2).clamp(0, n - 1);
           i <= (mid + 2).clamp(0, n - 1);
           i++) indices.add(i);
-      // End: last 5 chunks
       for (int i = (n - 5).clamp(0, n - 1); i < n; i++) indices.add(i);
 
       final sample = (indices.toList()..sort()).map((i) => allChunks[i]).toList();
@@ -355,6 +410,11 @@ CREATE TABLE standalone_messages (
       for (int d = -2; d <= 2; d++) {
         if (page + d >= 1) pageSet.add(page + d);
       }
+    }
+
+    // Respect excludePages in expansion too
+    if (excludePages != null && excludePages.isNotEmpty) {
+      pageSet.removeAll(excludePages);
     }
 
     final pageList = pageSet.toList()..sort();

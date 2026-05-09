@@ -415,10 +415,13 @@ class DocumentExtractionService {
   }
 
   static Future<void> _processChunk(Map<String, dynamic> params) async {
-    final chunks =
-        await Isolate.run(() => _extractPdfChunk(params));
-    if (chunks.isNotEmpty) {
-      await DatabaseHelper.instance.insertDocumentChunksBatch(chunks);
+    final chunks = await Isolate.run(() => _extractPdfChunk(params));
+    // Filter out empty pages (failed extraction, scanned images, etc.)
+    final nonEmpty = chunks
+        .where((c) => (c['extracted_text'] as String).trim().isNotEmpty)
+        .toList();
+    if (nonEmpty.isNotEmpty) {
+      await DatabaseHelper.instance.insertDocumentChunksBatch(nonEmpty);
     }
   }
 
