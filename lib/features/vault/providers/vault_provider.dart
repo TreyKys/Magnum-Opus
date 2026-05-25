@@ -269,31 +269,36 @@ class VaultNotifier extends Notifier<VaultState> {
 
   Future<void> _runPdfDivision(
       DocumentModel doc, Uint8List bytes, int totalPages) async {
-    // Step 1: Extract ALL pages as chunks (BM25 fallback + skeleton)
-    await DocumentExtractionService.extractDocument(doc, (_) {});
 
-    // Step 2: Select brain pages and upload to Gemini File API
+    // Step 1: Handle Intake Router logic for Pipeline A vs B
     if (totalPages <= 50) {
-      // Pipeline A: entire PDF is the brain
+      // Pipeline A: Bypass SQLite entirely. Upload directly via Gemini File API.
       final fileUri =
           await GeminiFileService.uploadPdfWithRetry(bytes, doc.title);
       await DatabaseHelper.instance
           .updateDocumentFileUri(doc.id, fileUri, DateTime.now());
-      // For Pipeline A, all pages are in the File API — no brainPages stored
+
+      // We still run basic extraction to power non-RAG features like skeleton generation,
+      // but the core chat will strictly bypass SQLite because fileUri exists and totalPages <= 50.
+      await DocumentExtractionService.extractDocument(doc, (_) {});
     } else {
-      // Pipeline B: top 50 content-dense pages are the brain
-      final topPages = await DatabaseHelper.instance
-          .getTopContentPages(doc.id, limit: 50);
-      if (topPages.isNotEmpty) {
-        final brainBytes =
-            await GeminiFileService.extractSpecificPages(bytes, topPages);
-        final fileUri = await GeminiFileService.uploadPdfWithRetry(
-            brainBytes, '${doc.title} [Core]');
-        await DatabaseHelper.instance
-            .updateDocumentFileUri(doc.id, fileUri, DateTime.now());
-        await DatabaseHelper.instance
-            .updateDocumentBrainPages(doc.id, topPages);
-      }
+      // Pipeline B: The Brain (Pages 1-50) & The Archive (Pages 51+)
+
+      // The Archive: Chunked and stored in SQLite (handled by DocumentExtractionService)
+      await DocumentExtractionService.extractDocument(doc, (_) {});
+
+      // The Brain: Pages 1-50 sent to Gemini File API
+      final brainPages = List<int>.generate(50, (i) => i + 1);
+
+      final brainBytes =
+          await GeminiFileService.extractSpecificPages(bytes, brainPages);
+      final fileUri = await GeminiFileService.uploadPdfWithRetry(
+          brainBytes, '${doc.title} [Core]');
+
+      await DatabaseHelper.instance
+          .updateDocumentFileUri(doc.id, fileUri, DateTime.now());
+      await DatabaseHelper.instance
+          .updateDocumentBrainPages(doc.id, brainPages);
     }
 
     final newSet = Set<String>.from(state.indexingDocumentIds)

@@ -173,11 +173,25 @@ $userQuery
 
         Content newestContent;
         if (hasFileUri) {
-          newestContent = Content.multi([
-            FileData('application/pdf', fileUri!),
-            TextPart(prompt),
-            if (imageBytes != null) DataPart('image/png', imageBytes),
-          ]);
+          // Dynamic Payload Construction (Deliverable 3)
+          // Pipeline A & Pipeline B distinction
+
+          List<Part> parts = [
+            FilePart(Uri.parse(fileUri!)),
+          ];
+
+          if (archiveChunks != null && archiveChunks.isNotEmpty) {
+            // Pipeline B payload
+            parts.add(TextPart("Context from later pages: " + archiveChunks));
+          }
+
+          parts.add(TextPart(prompt));
+
+          if (imageBytes != null) {
+            parts.add(DataPart('image/png', imageBytes));
+          }
+
+          newestContent = Content.multi(parts);
         } else if (imageBytes != null) {
           newestContent = Content.multi([
             TextPart(prompt),

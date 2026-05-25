@@ -182,6 +182,27 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                     },
                   ),
           ),
+          // Syncing toast hook (Deliverable 4)
+          if (ref.watch(chatProvider(widget.document.id).notifier).isSyncing)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: AppTheme.accentBlue.withOpacity(0.1),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentBlue),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Syncing Document...',
+                    style: TextStyle(color: AppTheme.accentBlue, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
           // Input bar or no-energy banner
           energy <= 0
               ? _NoEnergyBanner(
@@ -191,7 +212,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
               : _InputBar(
                   controller: _inputController,
                   energy: energy,
-                  onSend: _send,
+                  onSend: ref.watch(chatProvider(widget.document.id).notifier).isSyncing ? null : _send, // Block input while syncing
                 ),
         ],
       ),
@@ -311,7 +332,7 @@ class _MessageBubble extends ConsumerWidget {
                     ),
                   ),
                   H1Config(
-                    textStyle: GoogleFonts.bricolageGrotesque(
+                    style: GoogleFonts.bricolageGrotesque(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -319,7 +340,7 @@ class _MessageBubble extends ConsumerWidget {
                     ),
                   ),
                   H2Config(
-                    textStyle: GoogleFonts.bricolageGrotesque(
+                    style: GoogleFonts.bricolageGrotesque(
                       fontSize: 19,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -327,7 +348,7 @@ class _MessageBubble extends ConsumerWidget {
                     ),
                   ),
                   H3Config(
-                    textStyle: GoogleFonts.bricolageGrotesque(
+                    style: GoogleFonts.bricolageGrotesque(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -430,12 +451,12 @@ class _SourceChip extends StatelessWidget {
 class _InputBar extends StatelessWidget {
   final TextEditingController controller;
   final int energy;
-  final VoidCallback onSend;
+  final VoidCallback? onSend;
 
   const _InputBar({
     required this.controller,
     required this.energy,
-    required this.onSend,
+    this.onSend,
   });
 
   @override
@@ -466,7 +487,7 @@ class _InputBar extends StatelessWidget {
                 suffixStyle: const TextStyle(
                     color: AppTheme.textMuted, fontSize: 11),
               ),
-              onSubmitted: (_) => onSend(),
+              onSubmitted: (_) { if (onSend != null) onSend!(); },
             ),
           ),
           const SizedBox(width: 8),
@@ -476,7 +497,7 @@ class _InputBar extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.accentBlue,
+                color: onSend == null ? AppTheme.surfaceVariant : AppTheme.accentBlue,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.send, color: Colors.white, size: 18),

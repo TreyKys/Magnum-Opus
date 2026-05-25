@@ -458,7 +458,7 @@ class _MessageBubble extends ConsumerWidget {
                       ),
                     ),
                     H1Config(
-                      textStyle: GoogleFonts.bricolageGrotesque(
+                      style: GoogleFonts.bricolageGrotesque(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -466,7 +466,7 @@ class _MessageBubble extends ConsumerWidget {
                       ),
                     ),
                     H2Config(
-                      textStyle: GoogleFonts.bricolageGrotesque(
+                      style: GoogleFonts.bricolageGrotesque(
                         fontSize: 19,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -474,7 +474,7 @@ class _MessageBubble extends ConsumerWidget {
                       ),
                     ),
                     H3Config(
-                      textStyle: GoogleFonts.bricolageGrotesque(
+                      style: GoogleFonts.bricolageGrotesque(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
