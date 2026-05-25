@@ -21,6 +21,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   final AiService _aiService = AiService();
   final Uuid _uuid = const Uuid();
   bool isThinking = false;
+  bool isSyncing = false; // UI hook for TTL Circuit Breaker
 
   @override
   List<ChatMessage> build() {
@@ -74,40 +75,33 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
       if (isPdf && hasFileUri) {
         final uploadedAt = doc!.fileUriUploadedAt;
+        // The Gemini File API automatically deletes files after 48 hours.
         final bool isExpired = uploadedAt == null ||
-            DateTime.now().difference(uploadedAt).inHours >= 47;
+            DateTime.now().difference(uploadedAt).inHours >= 47; // 47 to be safe
+
+        String activeFileUri = fileUri;
 
         if (isExpired) {
-          // Trigger background re-sync; fall back to BM25 for this query
-          _triggerBackgroundResync(doc);
+          // TTL Circuit Breaker (Deliverable 4)
+          // Silently trigger the File API upload function again in the background.
+          // Block chat input until new URI is returned.
+          isSyncing = true;
+          // Notify listeners to update UI (show Syncing toast/block input)
+          ref.notifyListeners();
 
-          final notice = ChatMessage(
-            id: _uuid.v4(),
-            documentId: arg,
-            text: 'Re-syncing document with AI — using cached excerpts for this query. '
-                'Future queries will use the full document.',
-            isUser: false,
-            timestamp: DateTime.now(),
-          );
-          await DatabaseHelper.instance.insertChatMessage(notice.toMap());
-          state = [...state, notice];
-
-          final chunks = await DatabaseHelper.instance
-              .getContextRichChunks(arg, query);
-          if (chunks == 'DOCUMENT_NOT_READY') {
-            await _appendNotReady();
-            return;
+          try {
+            activeFileUri = await _runBackgroundResync(doc);
+          } catch (e) {
+            // If resync fails, we will gracefully fall back to BM25 in this catch block.
+            activeFileUri = '';
+          } finally {
+            isSyncing = false;
+            ref.notifyListeners();
           }
-          response = await _aiService.generateRAGResponse(
-            contextChunks: chunks,
-            userQuery: query,
-            history: history,
-            imageBytes: imageBytes,
-            complexity: complexity,
-            documentSkeleton: skeleton,
-          );
-        } else {
-          // Valid File API path
+        }
+
+        if (activeFileUri.isNotEmpty) {
+          // Valid File API path (Pipeline A or B)
           String? archiveChunks;
           if (doc.totalPages > 50) {
             final brainPages = doc.brainPages ?? [];
@@ -123,8 +117,24 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
             imageBytes: imageBytes,
             complexity: complexity,
             documentSkeleton: skeleton,
-            fileUri: fileUri,
+            fileUri: activeFileUri,
             archiveChunks: archiveChunks,
+          );
+        } else {
+          // Fallback if re-sync failed or unexpected error
+          final chunks = await DatabaseHelper.instance
+              .getContextRichChunks(arg, query);
+          if (chunks == 'DOCUMENT_NOT_READY') {
+            await _appendNotReady();
+            return;
+          }
+          response = await _aiService.generateRAGResponse(
+            contextChunks: chunks,
+            userQuery: query,
+            history: history,
+            imageBytes: imageBytes,
+            complexity: complexity,
+            documentSkeleton: skeleton,
           );
         }
       } else {
@@ -195,23 +205,21 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   }
 
   /// Re-uploads the PDF brain in the background and updates the stored fileUri.
-  void _triggerBackgroundResync(DocumentModel doc) {
-    Future(() async {
-      final bytes = await File(doc.filePath).readAsBytes();
-      final Uint8List uploadBytes;
-      final brainPages = doc.brainPages;
-      if (doc.totalPages > 50 && brainPages != null && brainPages.isNotEmpty) {
-        uploadBytes =
-            await GeminiFileService.extractSpecificPages(bytes, brainPages);
-      } else {
-        uploadBytes = bytes;
-      }
-      final newUri =
-          await GeminiFileService.uploadPdfWithRetry(uploadBytes, doc.title);
-      await DatabaseHelper.instance
-          .updateDocumentFileUri(doc.id, newUri, DateTime.now());
-    }).catchError((_) {
-      // Silent — next query will retry
-    });
+  /// Returns the fresh URI.
+  Future<String> _runBackgroundResync(DocumentModel doc) async {
+    final bytes = await File(doc.filePath).readAsBytes();
+    final Uint8List uploadBytes;
+    final brainPages = doc.brainPages;
+    if (doc.totalPages > 50 && brainPages != null && brainPages.isNotEmpty) {
+      uploadBytes =
+          await GeminiFileService.extractSpecificPages(bytes, brainPages);
+    } else {
+      uploadBytes = bytes;
+    }
+    final newUri =
+        await GeminiFileService.uploadPdfWithRetry(uploadBytes, doc.title);
+    await DatabaseHelper.instance
+        .updateDocumentFileUri(doc.id, newUri, DateTime.now());
+    return newUri;
   }
 }

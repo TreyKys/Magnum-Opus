@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:math';
+import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -127,7 +128,10 @@ class GeminiFileService {
       final total = src.pages.count;
       for (final pageNum in sorted) {
         if (pageNum >= 1 && pageNum <= total) {
-          dst.pages.importPage(src.pages[pageNum - 1]);
+          final page = src.pages[pageNum - 1];
+          final template = page.createTemplate();
+          final newPage = dst.pages.add();
+          newPage.graphics.drawPdfTemplate(template, const Offset(0, 0));
         }
       }
       return Uint8List.fromList(await dst.save());

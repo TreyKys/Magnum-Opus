@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/ai/ai_service.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/services/chunking_utils.dart';
 
 // ─── Isolate entry-points (top-level, free functions) ─────────────────────────
 // Everything that touches `archive`, `html`, `excel`, or `syncfusion` MUST
@@ -41,12 +42,20 @@ Future<List<Map<String, dynamic>>> _extractPdfChunk(
       try {
         text = extractor.extractText(startPageIndex: i - 1, endPageIndex: i - 1);
       } catch (_) {}
-      chunks.add({
-        'id': '${DateTime.now().microsecondsSinceEpoch}$i',
-        'document_id': documentId,
-        'page_number': i,
-        'extracted_text': text,
-      });
+
+      text = text.trim();
+      if (text.isEmpty) continue;
+
+      // Pipeline B strict chunking: 500 token limit with 100 token overlap
+      final textChunks = ChunkingUtils.strictChunkText(text);
+      for (int c = 0; c < textChunks.length; c++) {
+        chunks.add({
+          'id': '${DateTime.now().microsecondsSinceEpoch}_${i}_$c',
+          'document_id': documentId,
+          'page_number': i,
+          'extracted_text': textChunks[c],
+        });
+      }
     }
   } finally {
     doc?.dispose();
