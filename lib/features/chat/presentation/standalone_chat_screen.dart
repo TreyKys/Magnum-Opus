@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,11 +11,13 @@ import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.da
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
-import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
 import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
 import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
+import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
+import 'package:magnum_opus/features/subscription/providers/usage_provider.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 class StandaloneChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
@@ -49,10 +49,19 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
     }
   }
 
-  void _sendImage(Uint8List bytes) {
+  void _sendImage(Uint8List bytes) async {
+    final isPro = ref.read(subscriptionProvider).hasSubscription;
+    final usage = ref.read(usageProvider);
+
+    if (!isPro && usage.queries >= 5) {
+      await RevenueCatUI.presentPaywallIfNeeded('pro');
+      return;
+    }
+
     final energy = ref.read(energyProvider);
     if (energy <= 0) return;
     ref.read(energyProvider.notifier).consumeEnergy();
+    ref.read(usageProvider.notifier).incrementQueries();
     ref.read(sessionMessagesProvider(widget.sessionId).notifier).sendMessage(
           'What\'s in this image?',
           imageBytes: bytes,
@@ -94,12 +103,22 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
     );
   }
 
-  void _send() {
+  void _send() async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
+
+    final isPro = ref.read(subscriptionProvider).hasSubscription;
+    final usage = ref.read(usageProvider);
+
+    if (!isPro && usage.queries >= 5) {
+      await RevenueCatUI.presentPaywallIfNeeded('pro');
+      return;
+    }
+
     final energy = ref.read(energyProvider);
     if (energy <= 0) return;
     ref.read(energyProvider.notifier).consumeEnergy();
+    ref.read(usageProvider.notifier).incrementQueries();
     final session = ref
         .read(standaloneChatProvider)
         .sessions
@@ -217,7 +236,9 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
                     itemCount: messages.length + (messages.isNotEmpty && messages.last.isUser ? 1 : 0),
                     itemBuilder: (_, i) {
-                      if (i == messages.length) return const _TypingIndicator();
+                      if (i == messages.length) {
+                        return const _TypingIndicator();
+                      }
                       return _MessageBubble(
                         message: messages[i],
                         initials: initials,
@@ -453,7 +474,7 @@ class _MessageBubble extends ConsumerWidget {
                     PConfig(
                       textStyle: GoogleFonts.bricolageGrotesque(
                         fontSize: 15,
-                        color: Colors.white.withOpacity(0.88),
+                        color: Colors.white.withAlpha(225),
                         height: 1.65,
                       ),
                     ),
@@ -498,7 +519,9 @@ class _MessageBubble extends ConsumerWidget {
                   ]),
                 ),
               ),
-              for (final src in parsed.sources) _SourceChip(text: src),
+              for (final src in parsed.sources) ...[
+                 _SourceChip(text: src),
+              ],
               const SizedBox(height: 8),
             ],
           ),
@@ -536,7 +559,7 @@ class _SourceChip extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppTheme.accentBlue.withOpacity(0.06),
+        color: AppTheme.accentBlue.withAlpha(15),
         border: const Border(left: BorderSide(color: AppTheme.accentBlue, width: 3)),
         borderRadius: const BorderRadius.only(
           topRight: Radius.circular(8),
@@ -699,7 +722,9 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 
   @override
   void dispose() {
-    for (final c in _controllers) c.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 

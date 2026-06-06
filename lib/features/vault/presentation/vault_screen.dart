@@ -1,12 +1,18 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/chat/presentation/standalone_chat_screen.dart';
+import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
-import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/document_view_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
+import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
+import 'package:magnum_opus/features/subscription/providers/usage_provider.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 class VaultScreen extends ConsumerWidget {
   const VaultScreen({super.key});
@@ -32,7 +38,15 @@ class VaultScreen extends ConsumerWidget {
     );
   }
 
-  void _showIngestSheet(BuildContext context, WidgetRef ref) {
+  void _showIngestSheet(BuildContext context, WidgetRef ref) async {
+    final hasSubscription = ref.read(subscriptionProvider).hasSubscription;
+    final usage = ref.read(usageProvider);
+
+    if (!hasSubscription && usage.documents >= 5) {
+      await RevenueCatUI.presentPaywallIfNeeded('pro');
+      return;
+    }
+
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
@@ -78,6 +92,7 @@ class VaultScreen extends ConsumerWidget {
                   subtitle: 'PDF, EPUB, DOCX, TXT, CSV',
                   onTap: () {
                     Navigator.pop(ctx);
+                    ref.read(usageProvider.notifier).incrementDocuments();
                     ref.read(vaultProvider.notifier).ingestDocument();
                   },
                 ),
@@ -88,6 +103,7 @@ class VaultScreen extends ConsumerWidget {
                   subtitle: 'XLSX, PPTX',
                   onTap: () {
                     Navigator.pop(ctx);
+                    ref.read(usageProvider.notifier).incrementDocuments();
                     ref.read(vaultProvider.notifier).ingestData();
                   },
                 ),
@@ -98,6 +114,7 @@ class VaultScreen extends ConsumerWidget {
                   subtitle: 'MP3, M4A, WAV — auto-transcribed',
                   onTap: () {
                     Navigator.pop(ctx);
+                    ref.read(usageProvider.notifier).incrementDocuments();
                     ref.read(vaultProvider.notifier).ingestAudio();
                   },
                 ),
@@ -163,6 +180,7 @@ class VaultScreen extends ConsumerWidget {
               final url = controller.text.trim();
               if (url.isNotEmpty) {
                 Navigator.pop(ctx);
+                ref.read(usageProvider.notifier).incrementDocuments();
                 ref.read(vaultProvider.notifier).ingestUrl(url);
               }
             },
@@ -226,7 +244,7 @@ class VaultScreen extends ConsumerWidget {
                                   width: 44,
                                   height: 44,
                                   decoration: BoxDecoration(
-                                    color: typeColor.withOpacity(0.12),
+                                    color: typeColor.withAlpha(31),
                                     borderRadius: BorderRadius.circular(11),
                                   ),
                                   child: Icon(
@@ -298,10 +316,44 @@ class VaultScreen extends ConsumerWidget {
                                 IconButton(
                                   icon: const Icon(Icons.chat_bubble_outline,
                                       color: AppTheme.textMuted, size: 18),
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    _slideRoute(DocumentChatScreen(document: doc)),
-                                  ),
+                                  onPressed: () async {
+                                    final notifier = ref.read(standaloneChatProvider.notifier);
+                                    final sessionId = await notifier.createSession(attachedDocumentId: doc.id);
+                                    if (sessionId != null && context.mounted) {
+                                      Navigator.push(
+                                        context,
+                                        _slideRoute(StandaloneChatScreen(sessionId: sessionId)),
+                                      );
+                                    } else if (context.mounted) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          backgroundColor: AppTheme.surface,
+                                          title: const Text('Session limit reached',
+                                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                                          content: const Text(
+                                            'You have 5 active sessions (free tier). Delete or archive one to continue.',
+                                            style: TextStyle(color: Colors.white70),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('OK', style: TextStyle(color: Colors.white54)),
+                                            ),
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                                Navigator.push(context,
+                                                    MaterialPageRoute(builder: (_) => const UpgradeScreen()));
+                                              },
+                                              child: const Text('Learn about Pro',
+                                                  style: TextStyle(color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
                                 // Delete
                                 IconButton(
@@ -419,7 +471,7 @@ class _TypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withAlpha(31),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Text(
@@ -539,9 +591,9 @@ class _EmptyBadgePill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withAlpha(26),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withAlpha(77)),
       ),
       child: Text(
         label,
@@ -581,7 +633,7 @@ class _IngestOption extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.12),
+          color: iconColor.withAlpha(31),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: iconColor, size: 20),

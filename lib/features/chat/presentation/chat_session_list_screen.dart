@@ -6,7 +6,6 @@ import 'package:magnum_opus/features/chat/presentation/archived_sessions_screen.
 import 'package:magnum_opus/features/chat/presentation/standalone_chat_screen.dart';
 import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dart';
 import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
-import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 
 class ChatSessionListScreen extends ConsumerWidget {
   const ChatSessionListScreen({super.key});
@@ -144,7 +143,7 @@ class _SessionCard extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue.withOpacity(0.12),
+                    color: AppTheme.accentBlue.withAlpha(30),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -316,9 +315,9 @@ class _LimitBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.accentBlue.withOpacity(0.08),
+        color: AppTheme.accentBlue.withAlpha(20),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.accentBlue.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.accentBlue.withAlpha(77)),
       ),
       child: const Row(
         children: [

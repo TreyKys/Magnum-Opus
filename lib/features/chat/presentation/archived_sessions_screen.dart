@@ -199,7 +199,7 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.06),
+                                    color: Colors.white.withAlpha(15),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(

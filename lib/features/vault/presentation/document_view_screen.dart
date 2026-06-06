@@ -467,7 +467,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
     _webFontScale = (_webFontScale + delta).clamp(0.7, 2.5);
     final pct = (_webFontScale * 100).round();
     _webViewController?.runJavaScript(
-      "document.documentElement.style.fontSize='${pct}%';",
+      "document.documentElement.style.fontSize='$pct%';",
     );
     setState(() {});
   }
@@ -523,7 +523,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: typeColor.withOpacity(0.15),
+              color: typeColor.withAlpha(38),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -590,9 +590,9 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withAlpha(25),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withAlpha(64)),
       ),
       child: Row(
         children: [
@@ -621,8 +621,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
                 color: _colorForType(widget.document.fileType), size: 15),
             const SizedBox(width: 8),
             Text(
-              '${cappedRows.length} rows · ${_tableHeaders.length} columns'
-              '${_tableRows.length > 1000 ? ' (first 1 000)' : ''}',
+              '$cappedRows.length rows · ${_tableHeaders.length} columns${_tableRows.length > 1000 ? ' (first 1 000)' : ''}',
               style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
           ]),
@@ -658,7 +657,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
                   rows: cappedRows.asMap().entries.map((e) {
                     return DataRow(
                       color: WidgetStateProperty.all(
-                        e.key.isEven ? AppTheme.background : AppTheme.surface.withOpacity(0.6),
+                        e.key.isEven ? AppTheme.background : AppTheme.surface.withAlpha(153),
                       ),
                       cells: e.value
                           .map((cell) => DataCell(SizedBox(

@@ -9,7 +9,6 @@ import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.da
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
-import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/document_view_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/vault_screen.dart';
@@ -361,7 +360,7 @@ class _RecentDocsList extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: _colorForType(doc.fileType).withOpacity(0.12),
+                      color: _colorForType(doc.fileType).withAlpha(31),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(

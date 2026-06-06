@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:magnum_opus/core/services/revenuecat_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
@@ -27,6 +28,9 @@ class MyHttpOverrides extends HttpOverrides {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize RevenueCat
+  await RevenueCatService.initialize();
 
   // Lock to portrait orientations only
   await SystemChrome.setPreferredOrientations([

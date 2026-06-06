@@ -5,14 +5,15 @@ import 'package:magnum_opus/features/settings/providers/complexity_provider.dart
 
 /// Full-width complexity slider widget — can be used in settings and onboarding.
 class ComplexityDial extends ConsumerWidget {
-  const ComplexityDial({super.key});
+  final bool enabled;
+  const ComplexityDial({super.key, this.enabled = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final complexity = ref.watch(complexityProvider);
     final notifier = ref.read(complexityProvider.notifier);
 
-    return Column(
+    final dial = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -27,9 +28,9 @@ class ComplexityDial extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: AppTheme.accentBlue.withOpacity(0.15),
+                color: AppTheme.accentBlue.withAlpha(38),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.accentBlue.withOpacity(0.4)),
+                border: Border.all(color: AppTheme.accentBlue.withAlpha(102)),
               ),
               child: Text(
                 complexityLabel(complexity),
@@ -53,10 +54,12 @@ class ComplexityDial extends ConsumerWidget {
           min: 0,
           max: 100,
           divisions: 20,
-          onChanged: (val) => notifier.setComplexity(val.round()),
+          onChanged: enabled ? (val) => notifier.setComplexity(val.round()) : null,
         ),
       ],
     );
+
+    return enabled ? dial : Opacity(opacity: 0.5, child: dial);
   }
 }
 

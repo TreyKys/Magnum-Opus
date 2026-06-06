@@ -3,91 +3,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:markdown_widget/markdown_widget.dart';
-import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:markdown/markdown.dart' as m;
-
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
-import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
-
-// ─── LaTeX rendering ──────────────────────────────────────────────────────────
-
-class LatexSyntax extends m.InlineSyntax {
-  LatexSyntax() : super(r'\$(.+?)\$');
-  @override
-  bool onMatch(m.InlineParser parser, Match match) {
-    final latex = match[1];
-    if (latex != null) {
-      parser.addNode(m.Element.text('latex', latex));
-      return true;
-    }
-    return false;
-  }
-}
-
-class LatexBlockSyntax extends m.BlockSyntax {
-  @override
-  RegExp get pattern => RegExp(r'^\$\$(.*?)\$\$$', multiLine: true);
-  @override
-  m.Node parse(m.BlockParser parser) {
-    final match = pattern.firstMatch(parser.current.content);
-    final latex = match?[1] ?? '';
-    parser.advance();
-    return m.Element.text('latexBlock', latex);
-  }
-}
-
-class LatexBlockNode extends SpanNode {
-  final Map<String, String> attributes;
-  final String textContent;
-  LatexBlockNode(this.attributes, this.textContent);
-  @override
-  InlineSpan build() => WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Math.tex(textContent,
-              textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
-        ),
-      );
-}
-
-class LatexBlockGenerator extends SpanNodeGeneratorWithTag {
-  LatexBlockGenerator()
-      : super(
-            tag: 'latexBlock',
-            generator: (e, config, visitor) =>
-                LatexBlockNode(e.attributes, e.textContent));
-  @override
-  SpanNode build() => LatexBlockNode(const {}, '');
-}
-
-class LatexGenerator extends SpanNodeGeneratorWithTag {
-  LatexGenerator()
-      : super(
-            tag: 'latex',
-            generator: (e, config, visitor) =>
-                LatexNode(e.attributes, e.textContent));
-  @override
-  SpanNode build() => LatexNode(const {}, '');
-}
-
-class LatexNode extends SpanNode {
-  final Map<String, String> attributes;
-  final String textContent;
-  LatexNode(this.attributes, this.textContent);
-  @override
-  InlineSpan build() => WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Math.tex(textContent,
-            textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
-      );
-}
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
+import 'package:magnum_opus/features/chat/presentation/standalone_chat_screen.dart';
+import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dart';
 
 class PdfViewerScreen extends ConsumerStatefulWidget {
   final DocumentModel document;
@@ -238,13 +159,14 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
               icon: const Icon(Icons.chat_bubble_outline, size: 20),
               label: const Text('Chat',
                   style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      DocumentChatScreen(document: widget.document),
-                ),
-              ),
+              onPressed: () async {
+                final sessionId = await ref.read(standaloneChatProvider.notifier).createSession(attachedDocumentId: widget.document.id);
+                if (!mounted) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => StandaloneChatScreen(sessionId: sessionId!)),
+                );
+              },
             ),
       body: Stack(
         children: [
@@ -323,7 +245,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
               bottom: 32,
               right: 32,
               child: FloatingActionButton(
-                backgroundColor: Colors.black.withOpacity(0.5),
+                backgroundColor: Colors.black.withAlpha(128),
                 elevation: 0,
                 onPressed: () => setState(() => _isFullScreen = false),
                 child: const Icon(Icons.fullscreen_exit,

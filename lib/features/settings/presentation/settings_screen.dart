@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+
+import 'package:magnum_opus/core/services/revenuecat_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
-import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
+import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -15,6 +18,7 @@ class SettingsScreen extends ConsumerWidget {
     final settingsState = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final displayName = ref.watch(onboardingProvider).displayName;
+    final hasSubscription = ref.watch(subscriptionProvider).hasSubscription;
 
     return Scaffold(
       appBar: AppBar(
@@ -27,40 +31,59 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // ── AI Intelligence ──────────────────────────────────────────────
+          if (hasSubscription)
+            _buildSection(
+              context,
+              'Pro Feature',
+              [
+                const ListTile(
+                  leading: Icon(Icons.star, color: AppTheme.accentGold),
+                  title: Text('Pro Feature Unlocked', style: TextStyle(color: Colors.white)),
+                  subtitle: Text('You have access to all Pro features.', style: TextStyle(color: AppTheme.textMuted)),
+                ),
+              ],
+            ),
+          if (hasSubscription) const SizedBox(height: 24),
+
           _buildSection(
             context,
             'Response Depth',
             [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Response Complexity',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+              GestureDetector(
+                onTap: () async {
+                  if (!hasSubscription) {
+                    await RevenueCatUI.presentPaywallIfNeeded('pro');
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Response Complexity',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Controls how deep and technical Magnum responds. Persists across sessions.',
-                      style:
-                          TextStyle(color: AppTheme.textMuted, fontSize: 12, height: 1.4),
-                    ),
-                    const SizedBox(height: 14),
-                    const ComplexityDial(),
-                  ],
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Controls how deep and technical Magnum responds. Persists across sessions.',
+                        style: TextStyle(
+                            color: AppTheme.textMuted, fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 14),
+                      ComplexityDial(enabled: hasSubscription),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 24),
 
-          // ── Preferences ──────────────────────────────────────────────────
           _buildSection(
             context,
             'Preferences',
@@ -95,7 +118,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // ── Document Viewer ───────────────────────────────────────────────
           _buildSection(
             context,
             'Document Viewer',
@@ -137,28 +159,37 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // ── Account ───────────────────────────────────────────────────────
           _buildSection(
             context,
             'Account',
             [
-              ListTile(
-                leading: const Icon(Icons.bolt_outlined, color: AppTheme.accentBlue),
-                title: const Text('Upgrade to Pro',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Unlimited queries & sessions',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const UpgradeScreen()),
+              if (!hasSubscription)
+                ListTile(
+                  leading: const Icon(Icons.bolt_outlined, color: AppTheme.accentBlue),
+                  title: const Text('Upgrade to Pro',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Unlimited queries & sessions',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                  onTap: () async {
+                    await RevenueCatUI.presentPaywallIfNeeded('pro');
+                    // Optional: handle paywall result
+                  },
                 ),
-              ),
+              if (hasSubscription)
+                ListTile(
+                  leading: const Icon(Icons.manage_accounts, color: AppTheme.accentGreen),
+                  title: const Text('Manage Subscription',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('View or change your plan',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                  onTap: () => RevenueCatService.showCustomerCenter(),
+                ),
             ],
           ),
           const SizedBox(height: 24),
 
-          // ── About ─────────────────────────────────────────────────────────
           _buildSection(
             context,
             'About',
@@ -269,8 +300,6 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-// ─── NeuroDev Labs footer ─────────────────────────────────────────────────────
-
 class _NeuroDevFooter extends StatelessWidget {
   const _NeuroDevFooter();
 
@@ -297,7 +326,7 @@ class _NeuroDevFooter extends StatelessWidget {
         Text(
           'NeuroDev Labs',
           style: GoogleFonts.average(
-            color: Colors.white.withOpacity(0.85),
+            color: Colors.white.withAlpha(217),
             fontSize: 22,
             letterSpacing: 1.5,
           ),

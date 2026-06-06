@@ -690,9 +690,9 @@ class _FormatBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withAlpha(30),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withAlpha(89)),
       ),
       child: Text(
         label,
@@ -738,7 +738,7 @@ class _BrainCard extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withAlpha(30),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -866,7 +866,7 @@ class _ProFeatureRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppTheme.accentBlue.withOpacity(0.12),
+              color: AppTheme.accentBlue.withAlpha(30),
               borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(icon, color: AppTheme.accentBlueLight, size: 18),
@@ -922,7 +922,7 @@ class _PersonaCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.accentBlue.withOpacity(0.12)
+              ? AppTheme.accentBlue.withAlpha(30)
               : AppTheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(

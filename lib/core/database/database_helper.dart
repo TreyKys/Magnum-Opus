@@ -358,13 +358,17 @@ CREATE TABLE standalone_messages (
       final text = (chunk['extracted_text'] as String).toLowerCase();
       int score = 0;
 
-      if (text.contains(queryLower)) score += 10;
+      if (text.contains(queryLower)) {
+        score += 10;
+      }
 
       for (final kw in keywords) {
         int idx = 0;
         while (true) {
           idx = text.indexOf(kw, idx);
-          if (idx == -1) break;
+          if (idx == -1) {
+            break;
+          }
           score++;
           idx += kw.length;
         }
@@ -378,12 +382,18 @@ CREATE TABLE standalone_messages (
       // Generic query — return distributed sample
       final n = allChunks.length;
       final indices = <int>{};
-      for (int i = 0; i < n && i < 6; i++) indices.add(i);
+      for (int i = 0; i < n && i < 6; i++) {
+        indices.add(i);
+      }
       final mid = n ~/ 2;
       for (int i = (mid - 2).clamp(0, n - 1);
           i <= (mid + 2).clamp(0, n - 1);
-          i++) indices.add(i);
-      for (int i = (n - 5).clamp(0, n - 1); i < n; i++) indices.add(i);
+          i++) {
+        indices.add(i);
+      }
+      for (int i = (n - 5).clamp(0, n - 1); i < n; i++) {
+        indices.add(i);
+      }
 
       final sample = (indices.toList()..sort()).map((i) => allChunks[i]).toList();
       final buf = StringBuffer();
@@ -408,7 +418,9 @@ CREATE TABLE standalone_messages (
     for (final chunk in top20) {
       final page = chunk['page_number'] as int;
       for (int d = -2; d <= 2; d++) {
-        if (page + d >= 1) pageSet.add(page + d);
+        if (page + d >= 1) {
+          pageSet.add(page + d);
+        }
       }
     }
 

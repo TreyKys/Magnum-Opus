@@ -177,12 +177,12 @@ $userQuery
           // Pipeline A & Pipeline B distinction
 
           List<Part> parts = [
-            FilePart(Uri.parse(fileUri!)),
+            FilePart(Uri.parse(fileUri)),
           ];
 
           if (archiveChunks != null && archiveChunks.isNotEmpty) {
             // Pipeline B payload
-            parts.add(TextPart("Context from later pages: " + archiveChunks));
+            parts.add(TextPart("Context from later pages: $archiveChunks"));
           }
 
           parts.add(TextPart(prompt));

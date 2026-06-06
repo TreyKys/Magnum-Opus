@@ -23,31 +23,10 @@ class ExportService {
     final safeTitle = documentTitle.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
     final filename = '${safeTitle.isEmpty ? 'Report' : safeTitle} — Magnum Opus.pdf';
 
-    // ── Tier 1: KaTeX HTML via platform WebView ──────────────────────────────
-    try {
-      final html = _buildHtml(documentTitle, dateStr, messages);
-      final pdfBytes = await Printing.convertHtml(
-        format: PdfPageFormat.a4,
-        html: html,
-      );
-      await Printing.sharePdf(bytes: pdfBytes, filename: filename);
-      return;
-    } catch (_) {
-      // WebView unavailable or network error — fall through to Tier 2
-    }
-
     // ── Tier 2: pw.Document with built-in fonts (always offline-safe) ─────────
     try {
       final pdfBytes = await _buildPwDocument(documentTitle, dateStr, messages);
       await Printing.sharePdf(bytes: pdfBytes, filename: filename);
-      try {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Exported — math shown as plain text in offline mode.'),
-            backgroundColor: Color(0xFF1A1A1A),
-          ),
-        );
-      } catch (_) {}
     } catch (e) {
       try {
         messenger.showSnackBar(
@@ -297,7 +276,6 @@ $messagesHtml
     List<ChatMessage> messages, {
     pw.Font? regular,
     pw.Font? bold,
-    pw.Font? mono,
   }) async {
     final pdf = pw.Document(
       theme: regular != null

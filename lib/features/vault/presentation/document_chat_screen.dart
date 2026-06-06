@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +14,9 @@ import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
 import 'package:magnum_opus/features/vault/services/export_service.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
+import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
+import 'package:magnum_opus/features/subscription/providers/usage_provider.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 class DocumentChatScreen extends ConsumerStatefulWidget {
   final DocumentModel document;
@@ -78,12 +80,22 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     );
   }
 
-  void _send() {
+  void _send() async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
+
+    final isPro = ref.read(subscriptionProvider).hasSubscription;
+    final usage = ref.read(usageProvider);
+
+    if (!isPro && usage.queries >= 5) {
+      await RevenueCatUI.presentPaywallIfNeeded('pro');
+      return;
+    }
+
     final energy = ref.read(energyProvider);
     if (energy <= 0) return;
     ref.read(energyProvider.notifier).consumeEnergy();
+    ref.read(usageProvider.notifier).incrementQueries();
     ref.read(chatProvider(widget.document.id).notifier).sendMessage(text);
     _inputController.clear();
     Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
@@ -174,7 +186,9 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                         vertical: 12, horizontal: 14),
                     itemCount: messages.length + (messages.isNotEmpty && messages.last.isUser ? 1 : 0),
                     itemBuilder: (_, i) {
-                      if (i == messages.length) return const _TypingIndicator();
+                      if (i == messages.length) {
+                        return const _TypingIndicator();
+                      }
                       return _MessageBubble(
                         message: messages[i],
                         initials: initials,
@@ -186,7 +200,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
           if (ref.watch(chatProvider(widget.document.id).notifier).isSyncing)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              color: AppTheme.accentBlue.withOpacity(0.1),
+              color: AppTheme.accentBlue.withAlpha(25),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -209,7 +223,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                   loadingAd: _loadingAd,
                   onWatchAd: _rewardedAd != null ? _showAd : null,
                 )
-              : _InputBar(
+              : InputBar(
                   controller: _inputController,
                   energy: energy,
                   onSend: ref.watch(chatProvider(widget.document.id).notifier).isSyncing ? null : _send, // Block input while syncing
@@ -222,7 +236,9 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   String _initials(String name) {
     if (name.isEmpty) return 'MO';
     final parts = name.trim().split(' ');
-    if (parts.length == 1) return parts[0][0].toUpperCase();
+    if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 }
@@ -232,7 +248,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
 class _MessageBubble extends ConsumerWidget {
   final ChatMessage message;
   final String initials;
-  const _MessageBubble({required this.message, required this.initials});
+  const _MessageBubble({super.key, required this.message, required this.initials});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -327,7 +343,7 @@ class _MessageBubble extends ConsumerWidget {
                   PConfig(
                     textStyle: GoogleFonts.bricolageGrotesque(
                       fontSize: 15,
-                      color: Colors.white.withOpacity(0.88),
+                      color: Colors.white.withAlpha(224),
                       height: 1.65,
                     ),
                   ),
@@ -372,7 +388,9 @@ class _MessageBubble extends ConsumerWidget {
                 ]),
               ),
             ),
-            for (final src in parsed.sources) _SourceChip(text: src),
+            for (final src in parsed.sources) ...[
+               _SourceChip(text: src),
+            ],
             const SizedBox(height: 8),
           ],
         ),
@@ -404,7 +422,7 @@ class _ParsedMessage {
 
 class _SourceChip extends StatelessWidget {
   final String text;
-  const _SourceChip({required this.text});
+  const _SourceChip({super.key, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +430,7 @@ class _SourceChip extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppTheme.accentBlue.withOpacity(0.06),
+        color: AppTheme.accentBlue.withAlpha(15),
         border: const Border(
           left: BorderSide(color: AppTheme.accentBlue, width: 3),
         ),
@@ -448,12 +466,13 @@ class _SourceChip extends StatelessWidget {
 
 // ─── Input bar ────────────────────────────────────────────────────────────────
 
-class _InputBar extends StatelessWidget {
+class InputBar extends StatelessWidget {
   final TextEditingController controller;
   final int energy;
   final VoidCallback? onSend;
 
-  const _InputBar({
+  const InputBar({
+    super.key,
     required this.controller,
     required this.energy,
     this.onSend,
@@ -487,7 +506,11 @@ class _InputBar extends StatelessWidget {
                 suffixStyle: const TextStyle(
                     color: AppTheme.textMuted, fontSize: 11),
               ),
-              onSubmitted: (_) { if (onSend != null) onSend!(); },
+              onSubmitted: (_) {
+                if (onSend != null) {
+                  onSend!();
+                }
+              },
             ),
           ),
           const SizedBox(width: 8),
@@ -515,7 +538,7 @@ class _NoEnergyBanner extends StatelessWidget {
   final bool loadingAd;
   final VoidCallback? onWatchAd;
 
-  const _NoEnergyBanner({required this.loadingAd, required this.onWatchAd});
+  const _NoEnergyBanner({super.key, required this.loadingAd, required this.onWatchAd});
 
   @override
   Widget build(BuildContext context) {
@@ -567,7 +590,7 @@ class _NoEnergyBanner extends StatelessWidget {
 // ─── Typing indicator ─────────────────────────────────────────────────────────
 
 class _TypingIndicator extends StatefulWidget {
-  const _TypingIndicator();
+  const _TypingIndicator({super.key});
   @override
   State<_TypingIndicator> createState() => _TypingIndicatorState();
 }
@@ -589,7 +612,9 @@ class _TypingIndicatorState extends State<_TypingIndicator>
     );
     _anims = List.generate(3, (i) {
       Future.delayed(Duration(milliseconds: i * 150), () {
-        if (mounted) _controllers[i].forward();
+        if (mounted) {
+          _controllers[i].forward();
+        }
       });
       return Tween<double>(begin: 0.3, end: 1.0).animate(_controllers[i]);
     });
@@ -597,7 +622,9 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 
   @override
   void dispose() {
-    for (final c in _controllers) c.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -651,7 +678,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 
 class _EmptyState extends StatelessWidget {
   final String docTitle;
-  const _EmptyState({required this.docTitle});
+  const _EmptyState({super.key, required this.docTitle});
 
   @override
   Widget build(BuildContext context) {

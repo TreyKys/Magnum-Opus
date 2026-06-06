@@ -7,7 +7,6 @@ import 'package:magnum_opus/core/ai/gemini_file_service.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/chat/models/chat_session_model.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
-import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 

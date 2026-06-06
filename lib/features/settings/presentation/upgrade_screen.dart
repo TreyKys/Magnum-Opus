@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:magnum_opus/core/services/revenuecat_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
-class UpgradeScreen extends StatelessWidget {
+final offeringsProvider = FutureProvider<Offerings?>((ref) async {
+  try {
+    return await RevenueCatService.getOfferings();
+  } catch (e) {
+    return null;
+  }
+});
+
+class UpgradeScreen extends ConsumerWidget {
   const UpgradeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final offerings = ref.watch(offeringsProvider);
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -18,57 +31,94 @@ class UpgradeScreen extends StatelessWidget {
         title: const Text('Upgrade',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _Header(),
-            const SizedBox(height: 28),
-            const _TierCard(
-              tier: 'Free',
-              price: 'Current plan',
-              isCurrent: true,
-              features: [
-                '5 AI queries per day',
-                '5 active chat sessions',
-                '3 audio document ingests',
-                'PDF, DOCX, PPTX, XLSX, EPUB',
-                'Gemini 2.5 Flash powered',
+      body: offerings.when(
+        data: (data) {
+          final pro = data?.getOffering('pro');
+          final lifetime = data?.getOffering('lifetime');
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _Header(),
+                const SizedBox(height: 28),
+                const _TierCard(
+                  tier: 'Free',
+                  price: 'Current plan',
+                  isCurrent: true,
+                  features: [
+                    '5 AI queries per day',
+                    '5 active chat sessions',
+                    '3 audio document ingests',
+                    'PDF, DOCX, PPTX, XLSX, EPUB',
+                    'Gemini 2.5 Flash powered',
+                  ],
+                ),
+                if (pro != null && pro.monthly != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: _TierCard(
+                      tier: 'Pro',
+                      price: '${pro.monthly!.storeProduct.priceString} / month',
+                      isCurrent: false,
+                      features: const [
+                        'Unlimited AI queries',
+                        'Unlimited chat sessions',
+                        'Unlimited audio ingests',
+                        'Priority response speed',
+                        'All Free features included',
+                      ],
+                      onTap: () => _purchase(context, pro.monthly!),
+                    ),
+                  ),
+                if (lifetime != null && lifetime.lifetime != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: _TierCard(
+                      tier: 'Lifetime',
+                      price: '${lifetime.lifetime!.storeProduct.priceString} once',
+                      isCurrent: false,
+                      isLifetime: true,
+                      features: const [
+                        'Everything in Pro — forever',
+                        'All future feature updates',
+                        'No recurring charges',
+                        'Priority support',
+                      ],
+                      onTap: () => _purchase(context, lifetime.lifetime!),
+                    ),
+                  ),
+                const SizedBox(height: 28),
+                const _Footer(),
               ],
             ),
-            const SizedBox(height: 16),
-            const _TierCard(
-              tier: 'Pro',
-              price: '\$7.99 / month',
-              isCurrent: false,
-              features: [
-                'Unlimited AI queries',
-                'Unlimited chat sessions',
-                'Unlimited audio ingests',
-                'Priority response speed',
-                'All Free features included',
-              ],
-            ),
-            const SizedBox(height: 16),
-            const _TierCard(
-              tier: 'Lifetime',
-              price: '\$159.99 once',
-              isCurrent: false,
-              isLifetime: true,
-              features: [
-                'Everything in Pro — forever',
-                'All future feature updates',
-                'No recurring charges',
-                'Priority support',
-              ],
-            ),
-            const SizedBox(height: 28),
-            const _Footer(),
-          ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(
+          child: Text(
+            'Error fetching offerings: $e',
+            style: const TextStyle(color: Colors.white),
+          ),
         ),
       ),
     );
+  }
+
+  void _purchase(BuildContext context, Package package) async {
+    try {
+      final customerInfo = await RevenueCatService.purchasePackage(package);
+      if (customerInfo != null && customerInfo.entitlements.all['pro']!.isActive) {
+        if (context.mounted) Navigator.pop(context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
   }
 }
 
@@ -83,7 +133,7 @@ class _Header extends StatelessWidget {
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            color: AppTheme.accentBlue.withOpacity(0.15),
+            color: AppTheme.accentBlue.withAlpha(38),
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.bolt, color: AppTheme.accentBlue, size: 32),
@@ -112,6 +162,7 @@ class _TierCard extends StatelessWidget {
   final bool isCurrent;
   final bool isLifetime;
   final List<String> features;
+  final VoidCallback? onTap;
 
   const _TierCard({
     required this.tier,
@@ -119,6 +170,7 @@ class _TierCard extends StatelessWidget {
     required this.isCurrent,
     required this.features,
     this.isLifetime = false,
+    this.onTap,
   });
 
   @override
@@ -132,8 +184,8 @@ class _TierCard extends StatelessWidget {
     final badgeColor = isCurrent
         ? AppTheme.surfaceVariant
         : isLifetime
-            ? const Color(0xFFFFD700).withOpacity(0.15)
-            : AppTheme.accentBlue.withOpacity(0.12);
+            ? const Color(0xFFFFD700).withAlpha(38)
+            : AppTheme.accentBlue.withAlpha(31);
 
     final badgeTextColor = isCurrent
         ? AppTheme.textMuted
@@ -222,27 +274,19 @@ class _TierCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: null,
+                onPressed: onTap,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isLifetime
-                      ? const Color(0xFFFFD700).withOpacity(0.15)
-                      : AppTheme.accentBlue.withOpacity(0.15),
-                  disabledBackgroundColor: isLifetime
-                      ? const Color(0xFFFFD700).withOpacity(0.15)
-                      : AppTheme.accentBlue.withOpacity(0.15),
-                  foregroundColor: isLifetime
                       ? const Color(0xFFFFD700)
-                      : AppTheme.accentBlueLight,
-                  disabledForegroundColor: isLifetime
-                      ? const Color(0xFFFFD700)
-                      : AppTheme.accentBlueLight,
+                      : AppTheme.accentBlue,
+                  foregroundColor: isLifetime ? Colors.black : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text(
-                  'Coming Soon',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                child: Text(
+                  isLifetime ? 'Go Lifetime' : 'Upgrade to Pro',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                 ),
               ),
             ),
