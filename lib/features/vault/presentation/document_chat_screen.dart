@@ -30,12 +30,14 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   RewardedAd? _rewardedAd;
+  RewardedInterstitialAd? _rewardedInterstitialAd;
   bool _loadingAd = false;
 
   @override
   void initState() {
     super.initState();
     _loadAd();
+    _loadRewardedInterstitial();
   }
 
   @override
@@ -43,13 +45,14 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     _inputController.dispose();
     _scrollController.dispose();
     _rewardedAd?.dispose();
+    _rewardedInterstitialAd?.dispose();
     super.dispose();
   }
 
   void _loadAd() {
     setState(() => _loadingAd = true);
     RewardedAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/5224354917',
+      adUnitId: 'ca-app-pub-6864344458492366/2702442692',
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
@@ -59,6 +62,17 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
           });
         },
         onAdFailedToLoad: (_) => setState(() => _loadingAd = false),
+      ),
+    );
+  }
+
+  void _loadRewardedInterstitial() {
+    RewardedInterstitialAd.load(
+      adUnitId: 'ca-app-pub-6864344458492366/6346174231',
+      request: const AdRequest(),
+      rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
+        onAdLoaded: (ad) => _rewardedInterstitialAd = ad,
+        onAdFailedToLoad: (_) => _rewardedInterstitialAd = null,
       ),
     );
   }
@@ -87,7 +101,15 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     final usage = ref.read(usageProvider);
 
     if (!isPro && usage.queries >= 5) {
-      await presentUpgradeFlow(context);
+      await presentQueryLimitFlow(
+        context,
+        ref,
+        ad: _rewardedInterstitialAd,
+        onAdConsumed: () {
+          _rewardedInterstitialAd = null;
+          _loadRewardedInterstitial();
+        },
+      );
       return;
     }
 

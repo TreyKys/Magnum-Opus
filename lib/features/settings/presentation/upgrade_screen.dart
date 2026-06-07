@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:magnum_opus/core/services/revenuecat_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
@@ -22,6 +24,63 @@ Future<void> presentUpgradeFlow(BuildContext context) async {
       await Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const UpgradeScreen()));
     }
+  }
+}
+
+/// Shown when a free user hits their daily query limit. Offers a choice
+/// between watching a Rewarded Interstitial for +2 queries (reusing the same
+/// energy-refill reward as the opt-in Rewarded ad) or going straight to Pro.
+/// Falls back to the upgrade flow if no interstitial is preloaded.
+Future<void> presentQueryLimitFlow(
+  BuildContext context,
+  WidgetRef ref, {
+  RewardedInterstitialAd? ad,
+  VoidCallback? onAdConsumed,
+}) async {
+  if (ad == null) {
+    await presentUpgradeFlow(context);
+    return;
+  }
+
+  final choice = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppTheme.surface,
+      title: const Text("You've hit today's free limit",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+      content: const Text(
+        'Watch a quick ad for 2 more queries today, or go Pro for unlimited access.',
+        style: TextStyle(color: Colors.white70),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, 'upgrade'),
+          child: const Text('Upgrade to Pro',
+              style: TextStyle(color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.accentBlue,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () => Navigator.pop(ctx, 'watch'),
+          child: const Text('Watch Ad (+2 queries)'),
+        ),
+      ],
+    ),
+  );
+
+  if (choice == 'upgrade') {
+    await presentUpgradeFlow(context);
+  } else if (choice == 'watch') {
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (a) => a.dispose(),
+      onAdFailedToShowFullScreenContent: (a, _) => a.dispose(),
+    );
+    ad.show(onUserEarnedReward: (_, __) {
+      ref.read(energyProvider.notifier).refillEnergy();
+    });
+    onAdConsumed?.call();
   }
 }
 
