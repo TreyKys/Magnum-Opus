@@ -64,7 +64,6 @@ class SessionMessagesNotifier
     String? attachedDocumentId,
   }) async {
     if (text.trim().isEmpty) return;
-    isSending = true;
 
     final userMsg = StandaloneMessage(
       id: _uuid.v4(),
@@ -93,10 +92,44 @@ class SessionMessagesNotifier
           sessionId, {'title': preview});
     }
 
+    await _runQuery(text.trim(),
+        imageBytes: imageBytes, attachedDocumentId: attachedDocumentId);
+  }
+
+  /// Re-runs the last failed query without deducting from the user's
+  /// query allowance — the original attempt already consumed it.
+  Future<void> retryLastMessage({String? attachedDocumentId}) async {
+    if (state.isEmpty || isSending) return;
+    final failedMsg = state.last;
+    if (failedMsg.isUser || !isRetryableAiFailure(failedMsg.text)) return;
+
+    String? query;
+    for (int i = state.length - 2; i >= 0; i--) {
+      if (state[i].isUser) {
+        query = state[i].text;
+        break;
+      }
+    }
+    if (query == null) return;
+
+    await DatabaseHelper.instance.deleteStandaloneMessage(failedMsg.id);
+    state = state.sublist(0, state.length - 1);
+    await _runQuery(query, attachedDocumentId: attachedDocumentId);
+  }
+
+  Future<void> _runQuery(
+    String text, {
+    Uint8List? imageBytes,
+    String? attachedDocumentId,
+  }) async {
+    isSending = true;
+
     try {
       final complexity = ref.read(complexityProvider);
+      // The current query's user message is always the trailing entry —
+      // exclude it so it isn't duplicated as both history and prompt.
       final history = state
-          .where((m) => m.id != userMsg.id)
+          .take(state.length - 1)
           .map((m) => ChatMessage(
                 id: m.id,
                 documentId: sessionId,

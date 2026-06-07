@@ -474,6 +474,11 @@ CREATE TABLE standalone_messages (
     );
   }
 
+  Future<void> deleteChatMessage(String messageId) async {
+    final db = await instance.database;
+    await db.delete('chat_history', where: 'id = ?', whereArgs: [messageId]);
+  }
+
   Future<void> togglePinChatMessage(String messageId, bool isPinned) async {
     final db = await instance.database;
     await db.update(
@@ -563,6 +568,11 @@ CREATE TABLE standalone_messages (
       ORDER BY timestamp DESC
       LIMIT 2
     ''', [sessionId]);
+  }
+
+  Future<void> deleteStandaloneMessage(String messageId) async {
+    final db = await instance.database;
+    await db.delete('standalone_messages', where: 'id = ?', whereArgs: [messageId]);
   }
 
   Future<void> clearSessionMessages(String sessionId) async {

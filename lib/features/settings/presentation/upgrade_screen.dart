@@ -1,8 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/services/revenuecat_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+
+/// Tries to show RevenueCat's remote paywall; if none is configured for the
+/// 'pro' offering (a common cause of "the upgrade button does nothing"),
+/// falls back to our built-in upgrade screen so the user always sees something.
+Future<void> presentUpgradeFlow(BuildContext context) async {
+  try {
+    final result = await RevenueCatUI.presentPaywallIfNeeded('pro');
+    if (result == PaywallResult.notPresented && context.mounted) {
+      await Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const UpgradeScreen()));
+    }
+  } catch (_) {
+    if (context.mounted) {
+      await Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const UpgradeScreen()));
+    }
+  }
+}
 
 final offeringsProvider = FutureProvider<Offerings?>((ref) async {
   try {
@@ -12,11 +33,18 @@ final offeringsProvider = FutureProvider<Offerings?>((ref) async {
   }
 });
 
-class UpgradeScreen extends ConsumerWidget {
+class UpgradeScreen extends ConsumerStatefulWidget {
   const UpgradeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UpgradeScreen> createState() => _UpgradeScreenState();
+}
+
+class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
+  String? _purchasingId;
+
+  @override
+  Widget build(BuildContext context) {
     final offerings = ref.watch(offeringsProvider);
 
     return Scaffold(
@@ -34,7 +62,6 @@ class UpgradeScreen extends ConsumerWidget {
       body: offerings.when(
         data: (data) {
           final pro = data?.getOffering('pro');
-          final lifetime = data?.getOffering('lifetime');
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
@@ -59,9 +86,10 @@ class UpgradeScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: _TierCard(
-                      tier: 'Pro',
+                      tier: 'Pro Monthly',
                       price: '${pro.monthly!.storeProduct.priceString} / month',
                       isCurrent: false,
+                      isLoading: _purchasingId == pro.monthly!.identifier,
                       features: const [
                         'Unlimited AI queries',
                         'Unlimited chat sessions',
@@ -69,24 +97,32 @@ class UpgradeScreen extends ConsumerWidget {
                         'Priority response speed',
                         'All Free features included',
                       ],
-                      onTap: () => _purchase(context, pro.monthly!),
+                      onTap: _purchasingId == null
+                          ? () => _purchase(context, pro.monthly!)
+                          : null,
                     ),
                   ),
-                if (lifetime != null && lifetime.lifetime != null)
+                if (pro != null && pro.annual != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: _TierCard(
-                      tier: 'Lifetime',
-                      price: '${lifetime.lifetime!.storeProduct.priceString} once',
+                      tier: 'Pro Annual',
+                      price: '${pro.annual!.storeProduct.priceString} / year',
+                      badge: 'BEST VALUE',
                       isCurrent: false,
-                      isLifetime: true,
+                      isFeatured: true,
+                      isLoading: _purchasingId == pro.annual!.identifier,
                       features: const [
-                        'Everything in Pro — forever',
-                        'All future feature updates',
-                        'No recurring charges',
-                        'Priority support',
+                        'Unlimited AI queries',
+                        'Unlimited chat sessions',
+                        'Unlimited audio ingests',
+                        'Priority response speed',
+                        'All Free features included',
+                        'Save vs. paying monthly',
                       ],
-                      onTap: () => _purchase(context, lifetime.lifetime!),
+                      onTap: _purchasingId == null
+                          ? () => _purchase(context, pro.annual!)
+                          : null,
                     ),
                   ),
                 const SizedBox(height: 28),
@@ -106,18 +142,56 @@ class UpgradeScreen extends ConsumerWidget {
     );
   }
 
-  void _purchase(BuildContext context, Package package) async {
+  Future<void> _purchase(BuildContext context, Package package) async {
+    setState(() => _purchasingId = package.identifier);
     try {
       final customerInfo = await RevenueCatService.purchasePackage(package);
-      if (customerInfo != null && customerInfo.entitlements.all['pro']!.isActive) {
-        if (context.mounted) Navigator.pop(context);
+      final isPro = customerInfo.entitlements.all['pro']?.isActive ?? false;
+      if (isPro) {
+        ref.read(subscriptionProvider.notifier).upgradeSubscription('pro');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Welcome to Pro — unlimited access unlocked!')),
+          );
+          Navigator.pop(context);
+        }
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase did not complete. Please try again.')),
+        );
+      }
+    } on PlatformException catch (e) {
+      final code = PurchasesErrorHelper.getErrorCode(e);
+      if (code == PurchasesErrorCode.purchaseCancelledError) {
+        // User cancelled — no need to show an error.
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_messageForErrorCode(code))),
+        );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          const SnackBar(content: Text('Something went wrong with the purchase. Please try again.')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _purchasingId = null);
+    }
+  }
+
+  String _messageForErrorCode(PurchasesErrorCode code) {
+    switch (code) {
+      case PurchasesErrorCode.networkError:
+        return 'No internet connection. Please check your network and try again.';
+      case PurchasesErrorCode.purchaseNotAllowedError:
+        return 'Purchases are not allowed on this device.';
+      case PurchasesErrorCode.productAlreadyPurchasedError:
+        return 'You already own this plan. Try restoring your purchases.';
+      case PurchasesErrorCode.paymentPendingError:
+        return 'Your payment is pending approval. Pro will activate once it completes.';
+      default:
+        return 'Something went wrong with the purchase. Please try again.';
     }
   }
 }
@@ -160,7 +234,9 @@ class _TierCard extends StatelessWidget {
   final String tier;
   final String price;
   final bool isCurrent;
-  final bool isLifetime;
+  final bool isFeatured;
+  final bool isLoading;
+  final String? badge;
   final List<String> features;
   final VoidCallback? onTap;
 
@@ -169,7 +245,9 @@ class _TierCard extends StatelessWidget {
     required this.price,
     required this.isCurrent,
     required this.features,
-    this.isLifetime = false,
+    this.isFeatured = false,
+    this.isLoading = false,
+    this.badge,
     this.onTap,
   });
 
@@ -177,27 +255,29 @@ class _TierCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderColor = isCurrent
         ? AppTheme.border
-        : isLifetime
+        : isFeatured
             ? const Color(0xFFFFD700)
             : AppTheme.accentBlue;
 
     final badgeColor = isCurrent
         ? AppTheme.surfaceVariant
-        : isLifetime
+        : isFeatured
             ? const Color(0xFFFFD700).withAlpha(38)
             : AppTheme.accentBlue.withAlpha(31);
 
     final badgeTextColor = isCurrent
         ? AppTheme.textMuted
-        : isLifetime
+        : isFeatured
             ? const Color(0xFFFFD700)
             : AppTheme.accentBlueLight;
+
+    final badgeLabel = isCurrent ? 'YOUR PLAN' : badge;
 
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: isCurrent ? 1 : 1.5),
+        border: Border.all(color: borderColor, width: isCurrent || isFeatured ? 1.5 : 1),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -227,7 +307,7 @@ class _TierCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isCurrent)
+              if (badgeLabel != null)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -235,7 +315,7 @@ class _TierCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'YOUR PLAN',
+                    badgeLabel,
                     style: TextStyle(
                         color: badgeTextColor,
                         fontSize: 10,
@@ -276,18 +356,27 @@ class _TierCard extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: onTap,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isLifetime
-                      ? const Color(0xFFFFD700)
-                      : AppTheme.accentBlue,
-                  foregroundColor: isLifetime ? Colors.black : Colors.white,
+                  backgroundColor: isFeatured ? const Color(0xFFFFD700) : AppTheme.accentBlue,
+                  foregroundColor: isFeatured ? Colors.black : Colors.white,
+                  disabledBackgroundColor:
+                      (isFeatured ? const Color(0xFFFFD700) : AppTheme.accentBlue).withAlpha(140),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text(
-                  isLifetime ? 'Go Lifetime' : 'Upgrade to Pro',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                ),
+                child: isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: isFeatured ? Colors.black : Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Upgrade to Pro',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      ),
               ),
             ),
           ],

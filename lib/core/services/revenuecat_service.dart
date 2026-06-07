@@ -24,14 +24,12 @@ class RevenueCatService {
     }
   }
 
-  /// Purchase a package
-  static Future<CustomerInfo?> purchasePackage(Package package) async {
-    try {
-      PurchaseResult purchaseResult = await Purchases.purchasePackage(package);
-      return purchaseResult.customerInfo;
-    } catch (e) {
-      return null;
-    }
+  /// Purchase a package. Throws on failure/cancellation so the caller can
+  /// give the user proper feedback (e.g. distinguish a cancelled purchase
+  /// from a real billing error).
+  static Future<CustomerInfo> purchasePackage(Package package) async {
+    final purchaseResult = await Purchases.purchasePackage(package);
+    return purchaseResult.customerInfo;
   }
 
 

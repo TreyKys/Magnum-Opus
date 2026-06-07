@@ -12,7 +12,29 @@ import 'package:magnum_opus/features/vault/presentation/document_view_screen.dar
 import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
 import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/subscription/providers/usage_provider.dart';
-import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+
+void showIngestToast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppTheme.surfaceVariant,
+      duration: const Duration(seconds: 3),
+      content: Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentBlue),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(message, style: const TextStyle(color: Colors.white, fontSize: 13)),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 class VaultScreen extends ConsumerWidget {
   const VaultScreen({super.key});
@@ -43,7 +65,7 @@ class VaultScreen extends ConsumerWidget {
     final usage = ref.read(usageProvider);
 
     if (!hasSubscription && usage.documents >= 5) {
-      await RevenueCatUI.presentPaywallIfNeeded('pro');
+      await presentUpgradeFlow(context);
       return;
     }
 
@@ -94,6 +116,7 @@ class VaultScreen extends ConsumerWidget {
                     Navigator.pop(ctx);
                     ref.read(usageProvider.notifier).incrementDocuments();
                     ref.read(vaultProvider.notifier).ingestDocument();
+                    showIngestToast(context, 'Adding document to your vault…');
                   },
                 ),
                 _IngestOption(
@@ -105,6 +128,7 @@ class VaultScreen extends ConsumerWidget {
                     Navigator.pop(ctx);
                     ref.read(usageProvider.notifier).incrementDocuments();
                     ref.read(vaultProvider.notifier).ingestData();
+                    showIngestToast(context, 'Adding file to your vault…');
                   },
                 ),
                 _IngestOption(
@@ -116,6 +140,7 @@ class VaultScreen extends ConsumerWidget {
                     Navigator.pop(ctx);
                     ref.read(usageProvider.notifier).incrementDocuments();
                     ref.read(vaultProvider.notifier).ingestAudio();
+                    showIngestToast(context, 'Transcribing audio — this can take a minute…');
                   },
                 ),
                 _IngestOption(
@@ -182,6 +207,7 @@ class VaultScreen extends ConsumerWidget {
                 Navigator.pop(ctx);
                 ref.read(usageProvider.notifier).incrementDocuments();
                 ref.read(vaultProvider.notifier).ingestUrl(url);
+                showIngestToast(context, 'Scraping and indexing the page…');
               }
             },
             child: const Text('Scrape'),

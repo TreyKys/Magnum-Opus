@@ -16,7 +16,6 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/subscription/providers/usage_provider.dart';
-import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 class DocumentChatScreen extends ConsumerStatefulWidget {
   final DocumentModel document;
@@ -88,7 +87,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     final usage = ref.read(usageProvider);
 
     if (!isPro && usage.queries >= 5) {
-      await RevenueCatUI.presentPaywallIfNeeded('pro');
+      await presentUpgradeFlow(context);
       return;
     }
 
@@ -192,6 +191,10 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                       return _MessageBubble(
                         message: messages[i],
                         initials: initials,
+                        isLast: i == messages.length - 1,
+                        onRetry: () => ref
+                            .read(chatProvider(widget.document.id).notifier)
+                            .retryLastMessage(),
                       );
                     },
                   ),
@@ -248,7 +251,15 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
 class _MessageBubble extends ConsumerWidget {
   final ChatMessage message;
   final String initials;
-  const _MessageBubble({super.key, required this.message, required this.initials});
+  final bool isLast;
+  final VoidCallback? onRetry;
+  const _MessageBubble({
+    super.key,
+    required this.message,
+    required this.initials,
+    this.isLast = false,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -371,6 +382,33 @@ class _MessageBubble extends ConsumerWidget {
                       height: 1.4,
                     ),
                   ),
+                  // H4–H6 are rare in AI replies but must stay close to body
+                  // size — otherwise they fall back to tiny theme defaults
+                  // and the reply looks like it has wildly inconsistent text.
+                  H4Config(
+                    style: GoogleFonts.bricolageGrotesque(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: 1.4,
+                    ),
+                  ),
+                  H5Config(
+                    style: GoogleFonts.bricolageGrotesque(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: 1.4,
+                    ),
+                  ),
+                  H6Config(
+                    style: GoogleFonts.bricolageGrotesque(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withAlpha(224),
+                      height: 1.4,
+                    ),
+                  ),
                   PreConfig(
                     textStyle: const TextStyle(fontSize: 13, height: 1.5),
                   ),
@@ -391,6 +429,21 @@ class _MessageBubble extends ConsumerWidget {
             for (final src in parsed.sources) ...[
                _SourceChip(text: src),
             ],
+            if (isLast && isRetryableAiFailure(message.text) && onRetry != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                child: OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh, size: 16, color: AppTheme.accentBlue),
+                  label: const Text('Retry — won\'t use a query',
+                      style: TextStyle(color: AppTheme.accentBlue, fontSize: 13, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.accentBlue),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
+                ),
+              ),
             const SizedBox(height: 8),
           ],
         ),

@@ -1,3 +1,17 @@
+/// AI-generated failure messages that warrant a retry without re-deducting
+/// the user's query allowance. Keep in sync with AiService._friendlyError
+/// and the generic fallbacks used by chat notifiers.
+const _kRetryableAiMessages = {
+  'The AI service is experiencing high demand right now. Please wait a moment and try again.',
+  'AI service is temporarily unavailable. Please try again shortly.',
+  'There was an issue with the AI connection. Please restart the app.',
+  'No internet connection. Please check your network and try again.',
+  'Something went wrong. Please try again in a moment.',
+  'Something went wrong. Please try again.',
+};
+
+bool isRetryableAiFailure(String text) => _kRetryableAiMessages.contains(text);
+
 class ChatMessage {
   final String id;
   final String documentId;

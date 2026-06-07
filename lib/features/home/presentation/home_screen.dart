@@ -431,6 +431,7 @@ class _QuickIngestGrid extends StatelessWidget {
         onTap: () {
           HapticFeedback.lightImpact();
           ref.read(vaultProvider.notifier).ingestDocument();
+          showIngestToast(context, 'Adding document to your vault…');
         },
       ),
       _IngestButton(
@@ -451,6 +452,7 @@ class _QuickIngestGrid extends StatelessWidget {
         onTap: () {
           HapticFeedback.lightImpact();
           ref.read(vaultProvider.notifier).ingestAudio();
+          showIngestToast(context, 'Transcribing audio — this can take a minute…');
         },
       ),
       _IngestButton(
@@ -614,6 +616,7 @@ void _showUrlDialog(BuildContext context, WidgetRef ref) {
             if (url.isNotEmpty) {
               Navigator.pop(ctx);
               ref.read(vaultProvider.notifier).ingestUrl(url);
+              showIngestToast(context, 'Scraping and indexing the page…');
             }
           },
           child: const Text('Scrape'),

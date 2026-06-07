@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 import 'package:magnum_opus/core/services/revenuecat_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
 import 'package:magnum_opus/features/subscription/providers/subscription_provider.dart';
@@ -52,7 +52,7 @@ class SettingsScreen extends ConsumerWidget {
               GestureDetector(
                 onTap: () async {
                   if (!hasSubscription) {
-                    await RevenueCatUI.presentPaywallIfNeeded('pro');
+                    await presentUpgradeFlow(context);
                   }
                 },
                 child: Padding(
@@ -171,10 +171,9 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: const Text('Unlimited queries & sessions',
                       style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                   trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
-                  onTap: () async {
-                    await RevenueCatUI.presentPaywallIfNeeded('pro');
-                    // Optional: handle paywall result
-                  },
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const UpgradeScreen()),
+                  ),
                 ),
               if (hasSubscription)
                 ListTile(

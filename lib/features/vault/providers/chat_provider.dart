@@ -59,13 +59,40 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     );
     await DatabaseHelper.instance.insertChatMessage(userMessage.toMap());
     state = [...state, userMessage];
+    await _runQuery(query, imageBytes: imageBytes);
+  }
+
+  /// Re-runs the last failed query without deducting from the user's
+  /// query allowance — the original attempt already consumed it.
+  Future<void> retryLastMessage() async {
+    if (state.isEmpty || isThinking) return;
+    final failedMsg = state.last;
+    if (failedMsg.isUser || !isRetryableAiFailure(failedMsg.text)) return;
+
+    String? query;
+    for (int i = state.length - 2; i >= 0; i--) {
+      if (state[i].isUser) {
+        query = state[i].text;
+        break;
+      }
+    }
+    if (query == null) return;
+
+    await DatabaseHelper.instance.deleteChatMessage(failedMsg.id);
+    state = state.sublist(0, state.length - 1);
+    await _runQuery(query, imageBytes: null);
+  }
+
+  Future<void> _runQuery(String query, {Uint8List? imageBytes}) async {
     isThinking = true;
 
     try {
       final doc = await DatabaseHelper.instance.getDocumentById(arg);
       final complexity = ref.read(complexityProvider);
       final skeleton = await DatabaseHelper.instance.getDocumentSkeleton(arg);
-      final history = state.where((m) => m.id != userMessage.id).toList();
+      // The current query's user message is always the trailing entry —
+      // exclude it so it isn't duplicated as both history and prompt.
+      final history = state.sublist(0, state.length - 1);
 
       final bool isPdf = doc?.fileType == 'pdf';
       final String? fileUri = doc?.fileUri;

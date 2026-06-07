@@ -95,7 +95,15 @@ class ChatSessionListScreen extends ConsumerWidget {
       );
       return;
     }
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppTheme.accentBlue),
+      ),
+    );
     final id = await ref.read(standaloneChatProvider.notifier).createSession();
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
     if (id != null && context.mounted) {
       _openSession(context, ref, id);
     }
