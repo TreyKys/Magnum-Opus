@@ -1,10 +1,14 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'package:flutter/services.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:archive/archive.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:excel/excel.dart';
 import 'package:uuid/uuid.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdfx/pdfx.dart' as pdfx;
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/ai/ai_service.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
@@ -27,11 +31,19 @@ Future<List<Map<String, dynamic>>> _extractPdfChunk(
   final int startPage = params['startPage'];
   final int endPage = params['endPage'];
   final String documentId = params['documentId'];
+  final RootIsolateToken token = params['token'];
+  final String tempDirPath = params['tempDirPath'];
+
+  BackgroundIsolateBinaryMessenger.ensureInitialized(token);
 
   final file = File(filePath);
   if (!file.existsSync()) return [];
   final bytes = file.readAsBytesSync();
   PdfDocument? doc;
+  pdfx.PdfDocument? pdfxDoc;
+  // Reused across every scanned page in this chunk — loading the ML Kit
+  // model per page is expensive and unnecessary.
+  TextRecognizer? textRecognizer;
   final chunks = <Map<String, dynamic>>[];
 
   try {
@@ -44,6 +56,49 @@ Future<List<Map<String, dynamic>>> _extractPdfChunk(
       } catch (_) {}
 
       text = text.trim();
+
+      // The OCR Trigger: if text is empty, process as scanned page
+      if (text.isEmpty) {
+        File? tempImgFile;
+        try {
+          // Lazily initialize pdfxDoc once for this chunk
+          pdfxDoc ??= await pdfx.PdfDocument.openFile(filePath);
+
+          final page = await pdfxDoc.getPage(i);
+          try {
+            // Render at 300dpi equivalent or standard readable size
+            final pageImage = await page.render(
+              width: page.width * 2,
+              height: page.height * 2,
+              format: pdfx.PdfPageImageFormat.png,
+            );
+
+            if (pageImage != null) {
+              tempImgFile = File('$tempDirPath/${_uuid.v4()}_page_$i.png');
+              await tempImgFile.writeAsBytes(pageImage.bytes);
+
+              textRecognizer ??=
+                  TextRecognizer(script: TextRecognitionScript.latin);
+              final inputImage = InputImage.fromFilePath(tempImgFile.path);
+              final recognizedText =
+                  await textRecognizer.processImage(inputImage);
+
+              text = recognizedText.text.trim();
+            }
+          } finally {
+            await page.close();
+          }
+        } catch (e) {
+          // Log silently and skip page if OCR fails
+        } finally {
+          // Always clean up the rendered page image, even if OCR threw —
+          // otherwise failed pages leak PNGs into the temp directory.
+          if (tempImgFile != null && tempImgFile.existsSync()) {
+            await tempImgFile.delete();
+          }
+        }
+      }
+
       if (text.isEmpty) continue;
 
       // Pipeline B strict chunking: 500 token limit with 100 token overlap
@@ -59,6 +114,12 @@ Future<List<Map<String, dynamic>>> _extractPdfChunk(
     }
   } finally {
     doc?.dispose();
+    if (pdfxDoc != null) {
+      await pdfxDoc.close();
+    }
+    if (textRecognizer != null) {
+      await textRecognizer.close();
+    }
   }
   return chunks;
 }
@@ -409,6 +470,9 @@ class DocumentExtractionService {
         await DatabaseHelper.instance.getExtractedPageCount(document.id);
     if (dbCount >= totalPages) return;
 
+    final tempDir = await getTemporaryDirectory();
+    final token = RootIsolateToken.instance!;
+
     final futures = <Future<void>>[];
     for (int i = 1; i <= totalPages; i += _pdfChunkPages) {
       final start = i;
@@ -418,6 +482,8 @@ class DocumentExtractionService {
         'startPage': start,
         'endPage': end,
         'documentId': document.id,
+        'token': token,
+        'tempDirPath': tempDir.path,
       }));
     }
     await Future.wait(futures);
