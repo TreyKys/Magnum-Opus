@@ -71,6 +71,7 @@ Future<void> presentQueryLimitFlow(
   );
 
   if (choice == 'upgrade') {
+    if (!context.mounted) return;
     await presentUpgradeFlow(context);
   } else if (choice == 'watch') {
     ad.fullScreenContentCallback = FullScreenContentCallback(

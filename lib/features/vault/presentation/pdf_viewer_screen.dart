@@ -161,7 +161,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                   style: TextStyle(fontWeight: FontWeight.w700)),
               onPressed: () async {
                 final sessionId = await ref.read(standaloneChatProvider.notifier).createSession(attachedDocumentId: widget.document.id);
-                if (!mounted) return;
+                if (!context.mounted) return;
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => StandaloneChatScreen(sessionId: sessionId!)),
