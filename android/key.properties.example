@@ -1,4 +1,11 @@
 storePassword=REPLACE_WITH_YOUR_KEYSTORE_PASSWORD
 keyPassword=REPLACE_WITH_YOUR_KEY_PASSWORD
 keyAlias=upload
-storeFile=upload-keystore.jks
+
+# storeFile MUST be an absolute path. A relative path here resolves
+# inconsistently depending on which Gradle module reads it (android/app/
+# vs android/) and has silently broken release signing before — the build
+# now refuses to run rather than repeat that. Put the keystore anywhere
+# outside the repo (it must never be committed) and point directly at it,
+# e.g.:
+storeFile=/home/user/upload-keystore.jks

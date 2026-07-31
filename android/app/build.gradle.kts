@@ -8,11 +8,39 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// key.properties must live at android/key.properties (this file's directory),
+// resolved via rootProject so it's unambiguous regardless of which module's
+// build script is reading it.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
 val hasReleaseKeystore = keystorePropertiesFile.exists()
 if (hasReleaseKeystore) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+
+    // storeFile must be an ABSOLUTE path (this is Flutter's own documented
+    // recommendation) — a relative path here is ambiguous: Gradle's file()
+    // resolves it against the CALLING module's directory (android/app/),
+    // which does not match where key.properties itself lives (android/).
+    // That mismatch previously caused release builds to silently resolve to
+    // a non-existent keystore. Fail the build loudly instead of ever
+    // falling back to the debug key for a "release" build type.
+    val storeFilePath = keystoreProperties["storeFile"] as String
+    val resolvedStoreFile = file(storeFilePath)
+    if (!resolvedStoreFile.isAbsolute) {
+        throw GradleException(
+            "android/key.properties: storeFile must be an ABSOLUTE path " +
+            "(e.g. /home/user/upload-keystore.jks), not \"$storeFilePath\". " +
+            "Relative paths resolve inconsistently depending on which Gradle " +
+            "module reads them and have silently broken release signing before."
+        )
+    }
+    if (!resolvedStoreFile.exists()) {
+        throw GradleException(
+            "android/key.properties points storeFile at " +
+            "\"${resolvedStoreFile.absolutePath}\" but no file exists there. " +
+            "Refusing to build a release AAB without the real signing key."
+        )
+    }
 }
 
 android {
@@ -47,6 +75,7 @@ android {
                 keyPassword = keystoreProperties["keyPassword"] as String
                 storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
+                // (storeFile validated as an existing absolute path above)
             }
         }
     }
@@ -54,9 +83,12 @@ android {
     buildTypes {
         release {
             // Signs with the dedicated release keystore (android/key.properties)
-            // when present. Falls back to the debug key ONLY so local
-            // `flutter run --release` still works without a keystore —
-            // never upload an AAB built without key.properties configured.
+            // when present — and the block above guarantees that if
+            // key.properties exists, it points at a real, absolute,
+            // existing keystore file (or the build fails outright).
+            // Falls back to the debug key ONLY when key.properties is
+            // entirely absent, so local `flutter run --release` still
+            // works without extra setup. Never upload an AAB built this way.
             signingConfig = if (hasReleaseKeystore) {
                 signingConfigs.getByName("release")
             } else {
