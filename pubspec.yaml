@@ -57,6 +57,7 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.1
   webview_flutter: ^4.13.1
+  purchases_flutter: ^8.4.0
   image_picker: ^1.1.2
 
 dev_dependencies:

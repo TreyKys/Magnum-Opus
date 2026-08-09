@@ -12,6 +12,7 @@ import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dar
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
@@ -50,9 +51,12 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
   }
 
   void _sendImage(Uint8List bytes) {
-    final energy = ref.read(energyProvider);
-    if (energy <= 0) return;
-    ref.read(energyProvider.notifier).consumeEnergy();
+    final isPro = ref.read(subscriptionProvider).isPro;
+    if (!isPro) {
+      final energy = ref.read(energyProvider);
+      if (energy <= 0) return;
+      ref.read(energyProvider.notifier).consumeEnergy();
+    }
     ref.read(sessionMessagesProvider(widget.sessionId).notifier).sendMessage(
           'What\'s in this image?',
           imageBytes: bytes,
@@ -97,9 +101,12 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
   void _send() {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
-    final energy = ref.read(energyProvider);
-    if (energy <= 0) return;
-    ref.read(energyProvider.notifier).consumeEnergy();
+    final isPro = ref.read(subscriptionProvider).isPro;
+    if (!isPro) {
+      final energy = ref.read(energyProvider);
+      if (energy <= 0) return;
+      ref.read(energyProvider.notifier).consumeEnergy();
+    }
     final session = ref
         .read(standaloneChatProvider)
         .sessions
@@ -127,6 +134,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
   Widget build(BuildContext context) {
     final messages = ref.watch(sessionMessagesProvider(widget.sessionId));
     final energy = ref.watch(energyProvider);
+    final isPro = ref.watch(subscriptionProvider).isPro;
     final displayName = ref.watch(onboardingProvider).displayName;
     final initials = _initials(displayName);
 
@@ -225,14 +233,14 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
                     },
                   ),
           ),
-          energy <= 0
+          (!isPro && energy <= 0)
               ? _NoEnergyBanner(
                   loadingAd: _loadingAd,
                   onWatchAd: _rewardedAd != null ? _showAd : null,
                 )
               : _InputBar(
                   controller: _inputController,
-                  energy: energy,
+                  energy: isPro ? -1 : energy,
                   onSend: _send,
                 ),
         ],
@@ -594,7 +602,7 @@ class _InputBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                suffixText: '$energy left',
+                suffixText: energy < 0 ? '∞ Pro' : '$energy left',
                 suffixStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
               ),
               onSubmitted: (_) => onSend(),

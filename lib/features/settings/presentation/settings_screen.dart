@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
 import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 
@@ -15,6 +16,7 @@ class SettingsScreen extends ConsumerWidget {
     final settingsState = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final displayName = ref.watch(onboardingProvider).displayName;
+    final isPro = ref.watch(subscriptionProvider).isPro;
 
     return Scaffold(
       appBar: AppBar(
@@ -143,11 +145,21 @@ class SettingsScreen extends ConsumerWidget {
             'Account',
             [
               ListTile(
-                leading: const Icon(Icons.bolt_outlined, color: AppTheme.accentBlue),
-                title: const Text('Upgrade to Pro',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Unlimited queries & sessions',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                leading: Icon(
+                  isPro ? Icons.workspace_premium : Icons.bolt_outlined,
+                  color: AppTheme.accentBlue,
+                ),
+                title: Text(
+                  isPro ? 'Magnum Opus Pro' : 'Upgrade to Pro',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isPro
+                      ? 'Unlimited queries & sessions active'
+                      : 'Unlimited queries & sessions',
+                  style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
                 trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
                 onTap: () => Navigator.push(
                   context,

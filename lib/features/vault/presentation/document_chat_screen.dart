@@ -8,6 +8,7 @@ import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
@@ -81,9 +82,12 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   void _send() {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
-    final energy = ref.read(energyProvider);
-    if (energy <= 0) return;
-    ref.read(energyProvider.notifier).consumeEnergy();
+    final isPro = ref.read(subscriptionProvider).isPro;
+    if (!isPro) {
+      final energy = ref.read(energyProvider);
+      if (energy <= 0) return;
+      ref.read(energyProvider.notifier).consumeEnergy();
+    }
     ref.read(chatProvider(widget.document.id).notifier).sendMessage(text);
     _inputController.clear();
     Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
@@ -103,6 +107,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   Widget build(BuildContext context) {
     final messages = ref.watch(chatProvider(widget.document.id));
     final energy = ref.watch(energyProvider);
+    final isPro = ref.watch(subscriptionProvider).isPro;
     final displayName = ref.watch(onboardingProvider).displayName;
     final initials = _initials(displayName);
 
@@ -182,15 +187,15 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                     },
                   ),
           ),
-          // Input bar or no-energy banner
-          energy <= 0
+          // Input bar or no-energy banner (Pro users never see the banner)
+          (!isPro && energy <= 0)
               ? _NoEnergyBanner(
                   loadingAd: _loadingAd,
                   onWatchAd: _rewardedAd != null ? _showAd : null,
                 )
               : _InputBar(
                   controller: _inputController,
-                  energy: energy,
+                  energy: isPro ? -1 : energy,
                   onSend: _send,
                 ),
         ],
@@ -462,7 +467,7 @@ class _InputBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                suffixText: '$energy left',
+                suffixText: energy < 0 ? '∞ Pro' : '$energy left',
                 suffixStyle: const TextStyle(
                     color: AppTheme.textMuted, fontSize: 11),
               ),

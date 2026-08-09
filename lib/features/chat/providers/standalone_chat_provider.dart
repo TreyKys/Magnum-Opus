@@ -8,6 +8,7 @@ import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/chat/models/chat_session_model.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 
@@ -50,13 +51,23 @@ class SessionMessagesNotifier
 
   @override
   List<StandaloneMessage> build() {
+    // Keep alive across navigation — see chat_provider.dart for rationale.
+    ref.keepAlive();
     _load();
     return [];
   }
 
   Future<void> _load() async {
-    final rows = await DatabaseHelper.instance.getSessionMessages(sessionId);
-    state = rows.map(StandaloneMessage.fromMap).toList();
+    try {
+      final rows = await DatabaseHelper.instance.getSessionMessages(sessionId);
+      state = rows.map(StandaloneMessage.fromMap).toList();
+    } catch (_) {
+      try {
+        final rows =
+            await DatabaseHelper.instance.getSessionMessages(sessionId);
+        state = rows.map(StandaloneMessage.fromMap).toList();
+      } catch (_) {}
+    }
   }
 
   Future<void> sendMessage(
@@ -299,8 +310,9 @@ class StandaloneChatNotifier extends Notifier<StandaloneChatState> {
 
   /// Creates a new session. Returns the new session id, or null if limit reached.
   Future<String?> createSession({String? attachedDocumentId}) async {
+    final isPro = ref.read(subscriptionProvider).isPro;
     final count = await DatabaseHelper.instance.countActiveSessions();
-    if (count >= _maxFreeSessions) return null;
+    if (!isPro && count >= _maxFreeSessions) return null;
 
     final id = _uuid.v4();
     final n = count + 1;

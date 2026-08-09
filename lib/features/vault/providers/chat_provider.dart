@@ -24,13 +24,28 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
   @override
   List<ChatMessage> build() {
+    // Keep this provider alive across navigation — without this, Riverpod
+    // disposes the notifier the instant the chat screen is popped and
+    // rebuilds it from scratch (re-querying SQLite) on re-entry. Any hiccup
+    // in that reload window makes messages appear to "vanish" even though
+    // they're safely persisted. Staying resident avoids the race entirely.
+    ref.keepAlive();
     _loadMessages();
     return [];
   }
 
   Future<void> _loadMessages() async {
-    final data = await DatabaseHelper.instance.getChatHistory(arg);
-    state = data.map((json) => ChatMessage.fromMap(json)).toList();
+    try {
+      final data = await DatabaseHelper.instance.getChatHistory(arg);
+      state = data.map((json) => ChatMessage.fromMap(json)).toList();
+    } catch (_) {
+      // Retry once — transient SQLite lock contention (e.g. concurrent
+      // PDF extraction writes) shouldn't permanently blank the chat.
+      try {
+        final data = await DatabaseHelper.instance.getChatHistory(arg);
+        state = data.map((json) => ChatMessage.fromMap(json)).toList();
+      } catch (_) {}
+    }
   }
 
   Future<void> clearChat() async {

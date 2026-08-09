@@ -1,11 +1,89 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 
-class UpgradeScreen extends StatelessWidget {
+class UpgradeScreen extends ConsumerStatefulWidget {
   const UpgradeScreen({super.key});
 
   @override
+  ConsumerState<UpgradeScreen> createState() => _UpgradeScreenState();
+}
+
+class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Pull fresh offerings each time the screen opens
+    Future.microtask(
+        () => ref.read(subscriptionProvider.notifier).refreshOfferings());
+  }
+
+  Package? _findPackage(Offerings? offerings, PackageType type) {
+    final current = offerings?.current;
+    if (current == null) return null;
+    for (final pkg in current.availablePackages) {
+      if (pkg.packageType == type) return pkg;
+    }
+    return null;
+  }
+
+  Future<void> _buy(Package package) async {
+    final notifier = ref.read(subscriptionProvider.notifier);
+    final success = await notifier.purchase(package);
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Welcome to Pro! Enjoy unlimited access.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+    } else {
+      final error = ref.read(subscriptionProvider).error;
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _restore() async {
+    final notifier = ref.read(subscriptionProvider.notifier);
+    final success = await notifier.restore();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Purchases restored — you\'re on Pro.'
+            : 'No previous purchases found.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final subState = ref.watch(subscriptionProvider);
+    final isPro = subState.isPro;
+    final isLoading = subState.isLoading;
+
+    final monthlyPackage =
+        _findPackage(subState.offerings, PackageType.monthly);
+    final lifetimePackage =
+        _findPackage(subState.offerings, PackageType.lifetime);
+
+    final monthlyPrice =
+        monthlyPackage?.storeProduct.priceString ?? '\$7.99 / month';
+    final lifetimePrice =
+        lifetimePackage?.storeProduct.priceString ?? '\$159.99 once';
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -25,11 +103,11 @@ class UpgradeScreen extends StatelessWidget {
           children: [
             const _Header(),
             const SizedBox(height: 28),
-            const _TierCard(
+            _TierCard(
               tier: 'Free',
               price: 'Current plan',
-              isCurrent: true,
-              features: [
+              isCurrent: !isPro,
+              features: const [
                 '5 AI queries per day',
                 '5 active chat sessions',
                 '3 audio document ingests',
@@ -38,32 +116,52 @@ class UpgradeScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            const _TierCard(
+            _TierCard(
               tier: 'Pro',
-              price: '\$7.99 / month',
-              isCurrent: false,
-              features: [
+              price: monthlyPrice,
+              isCurrent: isPro,
+              features: const [
                 'Unlimited AI queries',
                 'Unlimited chat sessions',
                 'Unlimited audio ingests',
                 'Priority response speed',
                 'All Free features included',
               ],
+              onBuy: (!isPro && monthlyPackage != null && !isLoading)
+                  ? () => _buy(monthlyPackage)
+                  : null,
+              buttonLabel: monthlyPackage == null && !isPro
+                  ? 'Unavailable'
+                  : (isLoading ? 'Processing…' : 'Subscribe'),
             ),
             const SizedBox(height: 16),
-            const _TierCard(
+            _TierCard(
               tier: 'Lifetime',
-              price: '\$159.99 once',
+              price: lifetimePrice,
               isCurrent: false,
               isLifetime: true,
-              features: [
+              features: const [
                 'Everything in Pro — forever',
                 'All future feature updates',
                 'No recurring charges',
                 'Priority support',
               ],
+              onBuy: (!isPro && lifetimePackage != null && !isLoading)
+                  ? () => _buy(lifetimePackage)
+                  : null,
+              buttonLabel: lifetimePackage == null && !isPro
+                  ? 'Unavailable'
+                  : (isLoading ? 'Processing…' : 'Buy Once'),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
+            TextButton(
+              onPressed: isLoading ? null : _restore,
+              child: const Text(
+                'Restore Purchases',
+                style: TextStyle(color: AppTheme.accentBlueLight, fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 8),
             const _Footer(),
           ],
         ),
@@ -112,6 +210,8 @@ class _TierCard extends StatelessWidget {
   final bool isCurrent;
   final bool isLifetime;
   final List<String> features;
+  final VoidCallback? onBuy;
+  final String buttonLabel;
 
   const _TierCard({
     required this.tier,
@@ -119,6 +219,8 @@ class _TierCard extends StatelessWidget {
     required this.isCurrent,
     required this.features,
     this.isLifetime = false,
+    this.onBuy,
+    this.buttonLabel = 'Subscribe',
   });
 
   @override
@@ -222,7 +324,7 @@ class _TierCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: null,
+                onPressed: onBuy,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isLifetime
                       ? const Color(0xFFFFD700).withOpacity(0.15)
@@ -234,15 +336,15 @@ class _TierCard extends StatelessWidget {
                       ? const Color(0xFFFFD700)
                       : AppTheme.accentBlueLight,
                   disabledForegroundColor: isLifetime
-                      ? const Color(0xFFFFD700)
-                      : AppTheme.accentBlueLight,
+                      ? const Color(0xFFFFD700).withOpacity(0.6)
+                      : AppTheme.accentBlueLight.withOpacity(0.6),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text(
-                  'Coming Soon',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                child: Text(
+                  buttonLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                 ),
               ),
             ),

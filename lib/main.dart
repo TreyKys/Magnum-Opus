@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:magnum_opus/core/subscription/subscription_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
@@ -36,6 +37,10 @@ Future<void> main() async {
 
   await MobileAds.instance.initialize();
   await dotenv.load(fileName: '.env');
+
+  // Configure RevenueCat. No-ops safely if REVENUECAT_*_API_KEY isn't set
+  // in .env yet — app runs on the free tier until it is.
+  await SubscriptionService.init();
 
   // Dev SSL bypass — see MyHttpOverrides above
   HttpOverrides.global = MyHttpOverrides();
