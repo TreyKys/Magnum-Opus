@@ -451,7 +451,7 @@ class _QuickIngestGrid extends StatelessWidget {
         sub: 'MP3, M4A, WAV',
         onTap: () {
           HapticFeedback.lightImpact();
-          ref.read(vaultProvider.notifier).ingestAudio();
+          ingestAudioOrShowPaywall(context, ref);
         },
       ),
       _IngestButton(

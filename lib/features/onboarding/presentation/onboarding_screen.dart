@@ -429,7 +429,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 border: Border.all(color: AppTheme.border),
               ),
               child: const Text(
-                'Free tier: PDF & TXT · 5 queries/day · 1 free audio transcription · Unlimited document size',
+                'Free tier: PDF & TXT · 5 queries/day · 3 free audio transcriptions · Unlimited document size',
                 style:
                     TextStyle(color: AppTheme.textSecondary, fontSize: 12),
               ),

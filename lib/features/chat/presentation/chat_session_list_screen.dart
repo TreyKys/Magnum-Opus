@@ -7,6 +7,7 @@ import 'package:magnum_opus/features/chat/presentation/standalone_chat_screen.da
 import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dart';
 import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 
 class ChatSessionListScreen extends ConsumerWidget {
   const ChatSessionListScreen({super.key});
@@ -15,7 +16,8 @@ class ChatSessionListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(standaloneChatProvider);
     final sessions = state.sessions;
-    final atLimit = sessions.length >= 5;
+    final isPro = ref.watch(subscriptionProvider).isPro;
+    final atLimit = !isPro && sessions.length >= 5;
 
     return Scaffold(
       backgroundColor: AppTheme.background,

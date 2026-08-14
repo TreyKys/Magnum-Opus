@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
 import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
@@ -98,7 +100,7 @@ class VaultScreen extends ConsumerWidget {
                   subtitle: 'MP3, M4A, WAV — auto-transcribed',
                   onTap: () {
                     Navigator.pop(ctx);
-                    ref.read(vaultProvider.notifier).ingestAudio();
+                    ingestAudioOrShowPaywall(context, ref);
                   },
                 ),
                 _IngestOption(
@@ -404,6 +406,53 @@ class VaultScreen extends ConsumerWidget {
     if (type == 'pdf') return 'pages';
     return 'chunks';
   }
+}
+
+// ─── Shared audio-ingest gate ──────────────────────────────────────────────
+//
+// Free tier caps audio transcriptions at [VaultNotifier.maxFreeAudioIngests]
+// lifetime uses (bypassed for Pro). Both vault_screen.dart and
+// home_screen.dart's quick-ingest grid route through this single entry
+// point so the limit is enforced identically everywhere audio can be
+// ingested — never call VaultNotifier.ingestAudio() directly from UI code.
+void ingestAudioOrShowPaywall(BuildContext context, WidgetRef ref) {
+  final isPro = ref.read(subscriptionProvider).isPro;
+  final used = ref.read(vaultProvider).audioIngestsUsed;
+  final atLimit = !isPro && used >= VaultNotifier.maxFreeAudioIngests;
+
+  if (atLimit) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Free audio transcriptions used up',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: Text(
+          'You\'ve used all ${VaultNotifier.maxFreeAudioIngests} free audio transcriptions. '
+          'Upgrade to Pro for unlimited audio ingests.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const UpgradeScreen()));
+            },
+            child: const Text('Upgrade to Pro',
+                style: TextStyle(color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    return;
+  }
+
+  ref.read(vaultProvider.notifier).ingestAudio();
 }
 
 // ─── Type badge pill ──────────────────────────────────────────────────────────

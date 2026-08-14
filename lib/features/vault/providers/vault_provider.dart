@@ -4,11 +4,13 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path/path.dart' as p;
 import 'package:magnum_opus/core/ai/gemini_file_service.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/services/document_extraction_service.dart';
 import 'package:magnum_opus/features/vault/services/url_scraping_service.dart';
@@ -17,19 +19,23 @@ import 'package:magnum_opus/features/vault/services/audio_ingestion_service.dart
 class VaultState {
   final List<DocumentModel> documents;
   final Set<String> indexingDocumentIds;
+  final int audioIngestsUsed;
 
   VaultState({
     this.documents = const [],
     this.indexingDocumentIds = const {},
+    this.audioIngestsUsed = 0,
   });
 
   VaultState copyWith({
     List<DocumentModel>? documents,
     Set<String>? indexingDocumentIds,
+    int? audioIngestsUsed,
   }) {
     return VaultState(
       documents: documents ?? this.documents,
       indexingDocumentIds: indexingDocumentIds ?? this.indexingDocumentIds,
+      audioIngestsUsed: audioIngestsUsed ?? this.audioIngestsUsed,
     );
   }
 }
@@ -40,9 +46,16 @@ final vaultProvider =
 class VaultNotifier extends Notifier<VaultState> {
   static const _uuid = Uuid();
 
+  /// Lifetime free-tier cap on audio transcriptions. Not reset by deleting
+  /// documents — tracked independently in SharedPreferences so the count
+  /// can't be gamed by ingest-then-delete. Bypassed entirely for Pro users.
+  static const int maxFreeAudioIngests = 3;
+  static const String _audioIngestKey = 'audio_ingests_used';
+
   @override
   VaultState build() {
     _loadDocuments();
+    _loadAudioIngestCount();
     return VaultState();
   }
 
@@ -50,6 +63,12 @@ class VaultNotifier extends Notifier<VaultState> {
     final docs = await DatabaseHelper.instance.getAllDocuments();
     state = state.copyWith(documents: docs);
     _validateExtractions(docs);
+  }
+
+  Future<void> _loadAudioIngestCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = state.copyWith(
+        audioIngestsUsed: prefs.getInt(_audioIngestKey) ?? 0);
   }
 
   Future<void> _validateExtractions(List<DocumentModel> docs) async {
@@ -103,12 +122,21 @@ class VaultNotifier extends Notifier<VaultState> {
 
   // ─── Ingest: Audio (MP3, M4A, WAV) ──────────────────────────────────────
 
-  Future<void> ingestAudio() async {
+  /// Returns true if ingestion started, false if blocked (free-tier limit
+  /// reached) or cancelled/failed. Callers should check [isAudioLimitReached]
+  /// before invoking to show a paywall prompt instead of silently no-op'ing.
+  Future<bool> ingestAudio() async {
     try {
+      final isPro = ref.read(subscriptionProvider).isPro;
+      if (!isPro && state.audioIngestsUsed >= maxFreeAudioIngests) {
+        // Safety-net re-check — UI should already gate on isAudioLimitReached.
+        return false;
+      }
+
       final result = await FilePicker.platform.pickFiles(
         type: FileType.audio,
       );
-      if (result == null || result.files.single.path == null) return;
+      if (result == null || result.files.single.path == null) return false;
 
       final originalFile = File(result.files.single.path!);
       final appDir = await getApplicationDocumentsDirectory();
@@ -129,6 +157,15 @@ class VaultNotifier extends Notifier<VaultState> {
         fileType: 'audio',
       );
       await DatabaseHelper.instance.insertDocument(docModel);
+
+      // Consume one free-tier credit immediately on commit (mirrors energy
+      // gating elsewhere) — lifetime counter, unaffected by Pro status changes.
+      if (!isPro) {
+        final prefs = await SharedPreferences.getInstance();
+        final newCount = state.audioIngestsUsed + 1;
+        await prefs.setInt(_audioIngestKey, newCount);
+        state = state.copyWith(audioIngestsUsed: newCount);
+      }
 
       final indexingSet = Set<String>.from(state.indexingDocumentIds)..add(id);
       final updatedDocs = await DatabaseHelper.instance.getAllDocuments();
@@ -151,7 +188,10 @@ class VaultNotifier extends Notifier<VaultState> {
         final newSet = Set<String>.from(state.indexingDocumentIds)..remove(id);
         state = state.copyWith(indexingDocumentIds: newSet);
       });
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ─── Ingest: URL ─────────────────────────────────────────────────────────
