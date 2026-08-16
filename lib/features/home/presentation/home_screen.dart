@@ -79,7 +79,7 @@ class HomeScreen extends ConsumerWidget {
                       child: const Text(
                         'See all →',
                         style: TextStyle(
-                          color: AppTheme.accentBlueLight,
+                          color: AppTheme.accentLight,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -139,40 +139,51 @@ class _AppHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'MAGNUM OPUS',
-                    style: TextStyle(
-                      color: AppTheme.accentBlue,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2.0,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Brand lockup: serif wordmark over a short brass rule.
+                    // The rule is the system's recurring "printed matter" cue.
+                    Text(
+                      'Magnum Opus',
+                      style: AppTheme.display(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _timeGreeting(displayName),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: 7),
+                    Container(width: 26, height: 2, color: AppTheme.accent),
+                    const SizedBox(height: 9),
+                    Text(
+                      _timeGreeting(displayName),
+                      style: AppTheme.ui(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const Spacer(),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppTheme.accentBlue,
+              const SizedBox(width: 12),
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariant,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.accentDim),
+                ),
                 child: Text(
                   _initials(displayName),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: AppTheme.ui(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
+                    color: AppTheme.accentLight,
                   ),
                 ),
               ),
@@ -233,14 +244,14 @@ class _StatsRow extends StatelessWidget {
           Expanded(child: _StatCard(
             label: 'DOCUMENTS',
             value: '$docCount',
-            valueColor: Colors.white,
+            valueColor: AppTheme.textPrimary,
             sub: 'in library',
           )),
           const SizedBox(width: 12),
           Expanded(child: _StatCard(
             label: 'QUERIES TODAY',
             value: '$queriesUsed / $queriesMax',
-            valueColor: AppTheme.accentBlue,
+            valueColor: AppTheme.accent,
             sub: 'free tier',
           )),
         ],
@@ -268,7 +279,7 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
@@ -277,7 +288,7 @@ class _StatCard extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              color: AppTheme.accentBlue,
+              color: AppTheme.accent,
               fontSize: 9,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -351,7 +362,7 @@ class _RecentDocsList extends StatelessWidget {
                 margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppTheme.border),
                 ),
                 child: ListTile(
@@ -362,7 +373,7 @@ class _RecentDocsList extends StatelessWidget {
                     height: 36,
                     decoration: BoxDecoration(
                       color: _colorForType(doc.fileType).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
                       _iconForType(doc.fileType),
@@ -375,7 +386,7 @@ class _RecentDocsList extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -426,7 +437,7 @@ class _QuickIngestGrid extends StatelessWidget {
     final buttons = [
       _IngestButton(
         icon: Icons.description_outlined,
-        iconColor: AppTheme.accentBlueLight,
+        iconColor: AppTheme.accentLight,
         title: 'Documents',
         sub: 'PDF, EPUB, DOCX…',
         onTap: () {
@@ -530,11 +541,11 @@ class _IngestButton extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -547,7 +558,7 @@ class _IngestButton extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -577,37 +588,37 @@ void _showUrlDialog(BuildContext context, WidgetRef ref) {
       backgroundColor: AppTheme.surface,
       title: const Text(
         'Scrape Web URL',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
       ),
       content: TextField(
         controller: controller,
         autofocus: true,
         keyboardType: TextInputType.url,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: AppTheme.textPrimary),
         decoration: InputDecoration(
           hintText: 'https://example.com/article',
-          hintStyle: const TextStyle(color: Colors.white38),
+          hintStyle: const TextStyle(color: AppTheme.textMuted),
           filled: true,
           fillColor: AppTheme.background,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: AppTheme.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppTheme.accentBlue),
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: AppTheme.accent),
           ),
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.accentBlue,
-            foregroundColor: Colors.white,
+            backgroundColor: AppTheme.accent,
+            foregroundColor: AppTheme.onAccent,
             elevation: 0,
           ),
           onPressed: () {

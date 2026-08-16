@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/core/theme/markdown_theme.dart';
 import 'package:magnum_opus/features/chat/models/chat_session_model.dart';
 import 'package:magnum_opus/features/chat/providers/standalone_chat_provider.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
@@ -164,7 +164,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -173,7 +173,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
             Text(
               session?.title ?? 'Chat',
               style: const TextStyle(
-                  color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                  color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w700),
               overflow: TextOverflow.ellipsis,
             ),
             Text(
@@ -270,7 +270,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
               child: Text(
                 'Attach Document',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -303,7 +303,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
                       title: Text(
                         doc.title,
                         style: const TextStyle(
-                            color: Colors.white, fontSize: 13),
+                            color: AppTheme.textPrimary, fontSize: 13),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -406,21 +406,21 @@ class _MessageBubble extends ConsumerWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E2A3A),
-                    borderRadius: BorderRadius.circular(16),
+                    color: AppTheme.surfaceRaised,
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(message.text,
-                      style: const TextStyle(color: Colors.white, fontSize: 14)),
+                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             CircleAvatar(
               radius: 14,
-              backgroundColor: AppTheme.accentBlue,
+              backgroundColor: AppTheme.accent,
               child: Text(initials,
                   style: const TextStyle(
-                      color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                      color: AppTheme.onAccent, fontSize: 10, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -433,77 +433,21 @@ class _MessageBubble extends ConsumerWidget {
       child: GestureDetector(
         onLongPress: copyToClipboard,
         child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
-          ),
+          decoration: AppTheme.spinePanel(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-                child: Text(
-                  'MAGNUM OPUS · $depthLabel DEPTH',
-                  style: const TextStyle(
-                    color: AppTheme.accentBlue,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
-                ),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                child: Text('MAGNUM OPUS · $depthLabel DEPTH',
+                    style: AppTheme.eyebrow(color: AppTheme.accent)),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
                 child: MarkdownWidget(
                   data: parsed.body,
                   shrinkWrap: true,
-                  config: MarkdownConfig(configs: [
-                    PConfig(
-                      textStyle: GoogleFonts.bricolageGrotesque(
-                        fontSize: 15,
-                        color: Colors.white.withOpacity(0.88),
-                        height: 1.65,
-                      ),
-                    ),
-                    H1Config(
-                      textStyle: GoogleFonts.bricolageGrotesque(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        height: 1.4,
-                      ),
-                    ),
-                    H2Config(
-                      textStyle: GoogleFonts.bricolageGrotesque(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        height: 1.4,
-                      ),
-                    ),
-                    H3Config(
-                      textStyle: GoogleFonts.bricolageGrotesque(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        height: 1.4,
-                      ),
-                    ),
-                    PreConfig(
-                      textStyle: const TextStyle(fontSize: 13, height: 1.5),
-                    ),
-                    CodeConfig(
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF82AAFF),
-                        backgroundColor: Color(0xFF1E1E2E),
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    BlockquoteConfig(
-                      textColor: const Color(0xFFB3B3B3),
-                    ),
-                  ]),
+                  config: MarkdownTheme.response,
                 ),
               ),
               for (final src in parsed.sources) _SourceChip(text: src),
@@ -544,8 +488,8 @@ class _SourceChip extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppTheme.accentBlue.withOpacity(0.06),
-        border: const Border(left: BorderSide(color: AppTheme.accentBlue, width: 3)),
+        color: AppTheme.accent.withOpacity(0.06),
+        border: const Border(left: BorderSide(color: AppTheme.accent, width: 3)),
         borderRadius: const BorderRadius.only(
           topRight: Radius.circular(8),
           bottomRight: Radius.circular(8),
@@ -555,7 +499,7 @@ class _SourceChip extends StatelessWidget {
         children: [
           const Text('SRC',
               style: TextStyle(
-                  color: AppTheme.accentBlue,
+                  color: AppTheme.accent,
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8)),
@@ -588,7 +532,7 @@ class _InputBar extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
               maxLines: 4,
               minLines: 1,
               decoration: InputDecoration(
@@ -599,7 +543,7 @@ class _InputBar extends StatelessWidget {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
                 ),
                 suffixText: energy < 0 ? '∞ Pro' : '$energy left',
@@ -615,10 +559,10 @@ class _InputBar extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.accentBlue,
-                borderRadius: BorderRadius.circular(12),
+                color: AppTheme.accent,
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.send, color: Colors.white, size: 18),
+              child: const Icon(Icons.send, color: AppTheme.onAccent, size: 18),
             ),
           ),
         ],
@@ -651,14 +595,14 @@ class _NoEnergyBanner extends StatelessWidget {
             const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentBlue),
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accent),
             )
           else
             TextButton(
               onPressed: onWatchAd,
               child: const Text('Watch Ad +2',
                   style: TextStyle(
-                      color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
+                      color: AppTheme.accentLight, fontWeight: FontWeight.w700)),
             ),
           TextButton(
             onPressed: () => Navigator.push(
@@ -666,7 +610,7 @@ class _NoEnergyBanner extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const UpgradeScreen()),
             ),
             child: const Text('Upgrade',
-                style: TextStyle(color: Colors.white54, fontSize: 12)),
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
           ),
         ],
       ),
@@ -721,7 +665,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -729,7 +673,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                 const Text(
                   'Thinking',
                   style: TextStyle(
-                      color: AppTheme.accentBlue, fontSize: 11, fontWeight: FontWeight.w600),
+                      color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(width: 8),
                 ...List.generate(3, (i) => Padding(
@@ -740,7 +684,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                           width: 6,
                           height: 6,
                           decoration: const BoxDecoration(
-                            color: AppTheme.accentBlue,
+                            color: AppTheme.accent,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -775,7 +719,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               isRag ? 'Ask about this document' : 'Ask me anything',
               style: const TextStyle(
-                  color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                  color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             if (docTitle != null) ...[

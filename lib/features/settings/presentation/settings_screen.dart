@@ -42,7 +42,7 @@ class SettingsScreen extends ConsumerWidget {
                     const Text(
                       'Response Complexity',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -68,7 +68,7 @@ class SettingsScreen extends ConsumerWidget {
             'Preferences',
             [
               ListTile(
-                title: const Text('Display Name', style: TextStyle(color: Colors.white)),
+                title: const Text('Display Name', style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text(
                   displayName.isEmpty ? 'Not set' : displayName,
                   style: const TextStyle(color: AppTheme.textMuted),
@@ -78,7 +78,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
               SwitchListTile(
                 title: const Text('Haptic Feedback',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: const Text('Vibrations for UI interactions.',
                     style: TextStyle(color: AppTheme.textMuted)),
                 value: settingsState.enableHaptics,
@@ -86,7 +86,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
               SwitchListTile(
                 title: const Text('Reading Tips',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: const Text(
                     'Show helpful tips while loading documents.',
                     style: TextStyle(color: AppTheme.textMuted)),
@@ -104,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
             [
               ListTile(
                 title: const Text('Default Zoom Level',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text(
                   '${settingsState.defaultZoomLevel.toStringAsFixed(2)}x',
                   style: const TextStyle(color: AppTheme.textMuted),
@@ -147,12 +147,12 @@ class SettingsScreen extends ConsumerWidget {
               ListTile(
                 leading: Icon(
                   isPro ? Icons.workspace_premium : Icons.bolt_outlined,
-                  color: AppTheme.accentBlue,
+                  color: AppTheme.accent,
                 ),
                 title: Text(
                   isPro ? 'Magnum Opus Pro' : 'Upgrade to Pro',
                   style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600),
+                      color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
                   isPro
@@ -177,20 +177,20 @@ class SettingsScreen extends ConsumerWidget {
             [
               const ListTile(
                 title: Text('Version',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text('3.1.0 (Magnum Opus)',
                     style: TextStyle(color: AppTheme.textMuted)),
               ),
               const ListTile(
                 title: Text('Magnum Engine',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text(
                     'Proprietary · Local-first · v4',
                     style: TextStyle(color: AppTheme.textMuted)),
               ),
               const ListTile(
                 title: Text('Supported Formats',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text(
                     'PDF · EPUB · DOCX · XLSX · PPTX · CSV · TXT · Audio · URL',
                     style: TextStyle(color: AppTheme.textMuted, height: 1.5)),
@@ -212,35 +212,35 @@ class SettingsScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: const Text('Display Name',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppTheme.textPrimary),
           decoration: InputDecoration(
             hintText: 'First name or nickname',
-            hintStyle: const TextStyle(color: Colors.white38),
+            hintStyle: const TextStyle(color: AppTheme.textMuted),
             filled: true,
             fillColor: AppTheme.background,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(6),
               borderSide: const BorderSide(color: AppTheme.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppTheme.accentBlue),
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: AppTheme.accent),
             ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: AppTheme.accent,
+              foregroundColor: AppTheme.onAccent,
               elevation: 0,
             ),
             onPressed: () {
@@ -264,14 +264,14 @@ class SettingsScreen extends ConsumerWidget {
           child: Text(
             title.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.accentBlueLight,
+                  color: AppTheme.accentLight,
                 ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppTheme.border),
           ),
           child: Column(children: children),
@@ -309,7 +309,7 @@ class _NeuroDevFooter extends StatelessWidget {
         Text(
           'NeuroDev Labs',
           style: GoogleFonts.average(
-            color: Colors.white.withOpacity(0.85),
+            color: AppTheme.textPrimary.withOpacity(0.85),
             fontSize: 22,
             letterSpacing: 1.5,
           ),

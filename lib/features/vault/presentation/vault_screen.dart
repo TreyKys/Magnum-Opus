@@ -54,7 +54,7 @@ class VaultScreen extends ConsumerWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: AppTheme.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -75,7 +75,7 @@ class VaultScreen extends ConsumerWidget {
                 ),
                 _IngestOption(
                   icon: Icons.description_outlined,
-                  iconColor: AppTheme.accentBlueLight,
+                  iconColor: AppTheme.accentLight,
                   title: 'Documents',
                   subtitle: 'PDF, EPUB, DOCX, TXT, CSV',
                   onTap: () {
@@ -129,36 +129,36 @@ class VaultScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: const Text('Scrape Web URL',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.url,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppTheme.textPrimary),
           decoration: InputDecoration(
             hintText: 'https://example.com/article',
-            hintStyle: const TextStyle(color: Colors.white38),
+            hintStyle: const TextStyle(color: AppTheme.textMuted),
             filled: true,
             fillColor: AppTheme.background,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(6),
               borderSide: const BorderSide(color: AppTheme.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppTheme.accentBlue),
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: AppTheme.accent),
             ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: AppTheme.accent,
+              foregroundColor: AppTheme.onAccent,
               elevation: 0,
             ),
             onPressed: () {
@@ -198,11 +198,11 @@ class VaultScreen extends ConsumerWidget {
           child: Container(
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(9),
               border: Border.all(color: AppTheme.border),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(9),
               child: IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -229,7 +229,7 @@ class VaultScreen extends ConsumerWidget {
                                   height: 44,
                                   decoration: BoxDecoration(
                                     color: typeColor.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(11),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     _iconForType(doc.fileType),
@@ -251,7 +251,7 @@ class VaultScreen extends ConsumerWidget {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
-                                          color: Colors.white,
+                                          color: AppTheme.textPrimary,
                                           fontWeight: FontWeight.w600,
                                           fontSize: 15,
                                         ),
@@ -308,7 +308,7 @@ class VaultScreen extends ConsumerWidget {
                                 // Delete
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline,
-                                      color: Color(0xFFFF5252)),
+                                      color: AppTheme.danger),
                                   onPressed: () => ref
                                       .read(vaultProvider.notifier)
                                       .deleteDocument(doc.id, doc.filePath),
@@ -426,16 +426,16 @@ void ingestAudioOrShowPaywall(BuildContext context, WidgetRef ref) {
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: const Text('Free audio transcriptions used up',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
         content: Text(
           'You\'ve used all ${VaultNotifier.maxFreeAudioIngests} free audio transcriptions. '
           'Upgrade to Pro for unlimited audio ingests.',
-          style: const TextStyle(color: Colors.white70),
+          style: const TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(color: Colors.white54)),
+            child: const Text('OK', style: TextStyle(color: AppTheme.textMuted)),
           ),
           TextButton(
             onPressed: () {
@@ -444,7 +444,7 @@ void ingestAudioOrShowPaywall(BuildContext context, WidgetRef ref) {
                   MaterialPageRoute(builder: (_) => const UpgradeScreen()));
             },
             child: const Text('Upgrade to Pro',
-                style: TextStyle(color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
+                style: TextStyle(color: AppTheme.accentLight, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -558,7 +558,7 @@ class _EmptyStateState extends State<_EmptyState>
             const Text(
               'Your vault is empty',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
               ),
@@ -631,13 +631,13 @@ class _IngestOption extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           color: iconColor.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Icon(icon, color: iconColor, size: 20),
       ),
       title: Text(title,
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              color: AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
       subtitle: Text(subtitle,
           style: const TextStyle(color: AppTheme.textMuted, fontSize: 12)),
       onTap: onTap,
@@ -688,7 +688,7 @@ class _PulsingIndicatorState extends State<_PulsingIndicator>
             width: 7,
             height: 7,
             decoration: const BoxDecoration(
-              color: AppTheme.accentBlueLight,
+              color: AppTheme.accentLight,
               shape: BoxShape.circle,
             ),
           ),
@@ -697,7 +697,7 @@ class _PulsingIndicatorState extends State<_PulsingIndicator>
         const Text(
           'Indexing...',
           style: TextStyle(
-            color: AppTheme.accentBlueLight,
+            color: AppTheme.accentLight,
             fontSize: 10,
             fontWeight: FontWeight.w600,
           ),

@@ -90,11 +90,11 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Upgrade',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
@@ -158,7 +158,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
               onPressed: isLoading ? null : _restore,
               child: const Text(
                 'Restore Purchases',
-                style: TextStyle(color: AppTheme.accentBlueLight, fontSize: 13),
+                style: TextStyle(color: AppTheme.accentLight, fontSize: 13),
               ),
             ),
             const SizedBox(height: 8),
@@ -181,16 +181,16 @@ class _Header extends StatelessWidget {
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            color: AppTheme.accentBlue.withOpacity(0.15),
+            color: AppTheme.accent.withOpacity(0.15),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.bolt, color: AppTheme.accentBlue, size: 32),
+          child: const Icon(Icons.bolt, color: AppTheme.accent, size: 32),
         ),
         const SizedBox(height: 16),
         const Text(
           'Unlock Your Full Potential',
           style: TextStyle(
-              color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+              color: AppTheme.textPrimary, fontSize: 22, fontWeight: FontWeight.w800),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -228,25 +228,25 @@ class _TierCard extends StatelessWidget {
     final borderColor = isCurrent
         ? AppTheme.border
         : isLifetime
-            ? const Color(0xFFFFD700)
-            : AppTheme.accentBlue;
+            ? AppTheme.champagne
+            : AppTheme.accent;
 
     final badgeColor = isCurrent
         ? AppTheme.surfaceVariant
         : isLifetime
-            ? const Color(0xFFFFD700).withOpacity(0.15)
-            : AppTheme.accentBlue.withOpacity(0.12);
+            ? AppTheme.champagne.withOpacity(0.15)
+            : AppTheme.accent.withOpacity(0.12);
 
     final badgeTextColor = isCurrent
         ? AppTheme.textMuted
         : isLifetime
-            ? const Color(0xFFFFD700)
-            : AppTheme.accentBlueLight;
+            ? AppTheme.champagne
+            : AppTheme.accentLight;
 
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: borderColor, width: isCurrent ? 1 : 1.5),
       ),
       padding: const EdgeInsets.all(20),
@@ -262,7 +262,7 @@ class _TierCard extends StatelessWidget {
                     Text(
                       tier,
                       style: const TextStyle(
-                          color: Colors.white,
+                          color: AppTheme.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.w800),
                     ),
@@ -270,7 +270,7 @@ class _TierCard extends StatelessWidget {
                     Text(
                       price,
                       style: TextStyle(
-                          color: isCurrent ? AppTheme.textMuted : Colors.white,
+                          color: isCurrent ? AppTheme.textMuted : AppTheme.textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w600),
                     ),
@@ -304,14 +304,14 @@ class _TierCard extends StatelessWidget {
                     Icon(
                       Icons.check_circle_outline,
                       size: 16,
-                      color: isCurrent ? AppTheme.textMuted : AppTheme.accentBlue,
+                      color: isCurrent ? AppTheme.textMuted : AppTheme.accent,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         f,
                         style: TextStyle(
-                            color: isCurrent ? AppTheme.textMuted : Colors.white70,
+                            color: isCurrent ? AppTheme.textMuted : AppTheme.textSecondary,
                             fontSize: 13,
                             height: 1.4),
                       ),
@@ -327,20 +327,20 @@ class _TierCard extends StatelessWidget {
                 onPressed: onBuy,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isLifetime
-                      ? const Color(0xFFFFD700).withOpacity(0.15)
-                      : AppTheme.accentBlue.withOpacity(0.15),
+                      ? AppTheme.champagne.withOpacity(0.15)
+                      : AppTheme.accent.withOpacity(0.15),
                   disabledBackgroundColor: isLifetime
-                      ? const Color(0xFFFFD700).withOpacity(0.15)
-                      : AppTheme.accentBlue.withOpacity(0.15),
+                      ? AppTheme.champagne.withOpacity(0.15)
+                      : AppTheme.accent.withOpacity(0.15),
                   foregroundColor: isLifetime
-                      ? const Color(0xFFFFD700)
-                      : AppTheme.accentBlueLight,
+                      ? AppTheme.champagne
+                      : AppTheme.accentLight,
                   disabledForegroundColor: isLifetime
-                      ? const Color(0xFFFFD700).withOpacity(0.6)
-                      : AppTheme.accentBlueLight.withOpacity(0.6),
+                      ? AppTheme.champagne.withOpacity(0.6)
+                      : AppTheme.accentLight.withOpacity(0.6),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: Text(
                   buttonLabel,
@@ -366,11 +366,11 @@ class _Footer extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: AppTheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: const Row(
             children: [
-              Icon(Icons.verified_outlined, color: AppTheme.accentBlueLight, size: 18),
+              Icon(Icons.verified_outlined, color: AppTheme.accentLight, size: 18),
               SizedBox(width: 10),
               Expanded(
                 child: Text(

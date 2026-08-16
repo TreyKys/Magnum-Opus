@@ -164,16 +164,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppTheme.accent,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Icon(Icons.bolt, color: Colors.white, size: 24),
+                  child: const Icon(Icons.bolt, color: AppTheme.textPrimary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 const Text(
                   'Magnum Opus',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                   ),
@@ -189,7 +189,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 const Text(
                   'Your ',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     height: 1.2,
@@ -215,7 +215,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                     _taglineWords[_taglineIndex],
                     key: ValueKey(_taglineIndex),
                     style: const TextStyle(
-                      color: AppTheme.accentBlueLight,
+                      color: AppTheme.accentLight,
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
@@ -227,7 +227,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Partner for Docs',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
                 height: 1.2,
@@ -276,7 +276,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Anti-Hallucination',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
@@ -284,7 +284,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Architecture',
               style: TextStyle(
-                color: AppTheme.accentBlueLight,
+                color: AppTheme.accentLight,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
@@ -301,7 +301,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               description:
                   'A 200-word macro-summary is generated on ingest and pinned to every query. Magnum never loses the overarching context.',
               icon: Icons.account_tree_outlined,
-              color: AppTheme.accentBlue,
+              color: AppTheme.accent,
             ),
             const SizedBox(height: 16),
             _BrainCard(
@@ -310,7 +310,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               description:
                   'Retrieves the 15 most relevant chunks plus their adjacent paragraphs, ensuring unbroken context continuity.',
               icon: Icons.manage_search,
-              color: AppTheme.accentBlueLight,
+              color: AppTheme.accentLight,
             ),
             const SizedBox(height: 16),
             _BrainCard(
@@ -319,7 +319,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               description:
                   'Every response ends with exact source references — [Source: Page 42] — so you can verify every claim.',
               icon: Icons.verified_outlined,
-              color: const Color(0xFF16A34A),
+              color: AppTheme.success,
             ),
           ],
         ),
@@ -342,7 +342,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Your Complexity Dial',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
@@ -377,7 +377,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Magnum Opus Pro',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
@@ -386,7 +386,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               '\$7.99 / month  ·  \$69.99 / year  ·  \$159.99 lifetime',
               style:
-                  TextStyle(color: AppTheme.accentBlueLight, fontSize: 13),
+                  TextStyle(color: AppTheme.accentLight, fontSize: 13),
             ),
             const SizedBox(height: 32),
             _ProFeatureRow(
@@ -425,7 +425,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.border),
               ),
               child: const Text(
@@ -472,7 +472,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               child: Text(
                 'How will you use\nMagnum Opus?',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
                   height: 1.2,
@@ -511,7 +511,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 const Text(
                   'What should we call you?',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -540,7 +540,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'First name or nickname',
                 hintStyle: const TextStyle(color: AppTheme.textMuted),
@@ -549,17 +549,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 14),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: AppTheme.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: AppTheme.border),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide:
-                      const BorderSide(color: AppTheme.accentBlue, width: 2),
+                      const BorderSide(color: AppTheme.accent, width: 2),
                 ),
               ),
               textCapitalization: TextCapitalization.words,
@@ -573,12 +573,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               child: ElevatedButton(
                 onPressed: _selectedPersona.isNotEmpty ? _finish : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentBlue,
+                  backgroundColor: AppTheme.accent,
                   disabledBackgroundColor: AppTheme.border,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppTheme.textPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   elevation: 0,
                 ),
@@ -628,7 +628,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 height: 6,
                 decoration: BoxDecoration(
                   color: i == _currentPage
-                      ? AppTheme.accentBlue
+                      ? AppTheme.accent
                       : AppTheme.border,
                   borderRadius: BorderRadius.circular(3),
                 ),
@@ -642,7 +642,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               child: const Text(
                 'Next',
                 style: TextStyle(
-                  color: AppTheme.accentBlueLight,
+                  color: AppTheme.accentLight,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -728,7 +728,7 @@ class _BrainCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border),
       ),
       child: Row(
@@ -739,7 +739,7 @@ class _BrainCard extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
@@ -751,7 +751,7 @@ class _BrainCard extends StatelessWidget {
                 Text(
                   '$step  $title',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -804,7 +804,7 @@ class _ComplexityPreviewCard extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
@@ -812,12 +812,12 @@ class _ComplexityPreviewCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome, color: AppTheme.accentBlue, size: 14),
+              const Icon(Icons.auto_awesome, color: AppTheme.accent, size: 14),
               const SizedBox(width: 6),
               Text(
                 'Response preview — $label mode',
                 style: const TextStyle(
-                  color: AppTheme.accentBlueLight,
+                  color: AppTheme.accentLight,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -866,10 +866,10 @@ class _ProFeatureRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppTheme.accentBlue.withOpacity(0.12),
+              color: AppTheme.accent.withOpacity(0.12),
               borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, color: AppTheme.accentBlueLight, size: 18),
+            child: Icon(icon, color: AppTheme.accentLight, size: 18),
           ),
           const SizedBox(width: 14),
           Column(
@@ -878,7 +878,7 @@ class _ProFeatureRow extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 14),
               ),
@@ -922,11 +922,11 @@ class _PersonaCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.accentBlue.withOpacity(0.12)
+              ? AppTheme.accent.withOpacity(0.12)
               : AppTheme.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(9),
           border: Border.all(
-            color: selected ? AppTheme.accentBlue : AppTheme.border,
+            color: selected ? AppTheme.accent : AppTheme.border,
             width: selected ? 2 : 1,
           ),
         ),
@@ -935,14 +935,14 @@ class _PersonaCard extends StatelessWidget {
           children: [
             Icon(
               data.icon,
-              color: selected ? AppTheme.accentBlueLight : AppTheme.textMuted,
+              color: selected ? AppTheme.accentLight : AppTheme.textMuted,
               size: 24,
             ),
             const Spacer(),
             Text(
               data.label,
               style: TextStyle(
-                color: selected ? Colors.white : AppTheme.textSecondary,
+                color: selected ? AppTheme.textPrimary : AppTheme.textSecondary,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),

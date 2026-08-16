@@ -30,11 +30,18 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         index: _currentIndex,
         children: _tabs,
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      // Hairline rule above the bar — the same 1px separator used for
+      // section headers, so chrome and content share one visual language.
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppTheme.border)),
+        ),
+        child: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppTheme.surface,
-        selectedItemColor: AppTheme.accentBlue,
+        selectedItemColor: AppTheme.accent,
         unselectedItemColor: AppTheme.textMuted,
+        elevation: 0,
         selectedFontSize: 11,
         unselectedFontSize: 11,
         currentIndex: _currentIndex,
@@ -61,6 +68,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             label: 'Settings',
           ),
         ],
+        ),
       ),
     );
   }

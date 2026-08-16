@@ -50,7 +50,7 @@ class LatexBlockNode extends SpanNode {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: Math.tex(textContent,
-              textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
+              textStyle: const TextStyle(fontSize: 16, color: AppTheme.textPrimary)),
         ),
       );
 }
@@ -83,7 +83,7 @@ class LatexNode extends SpanNode {
   InlineSpan build() => WidgetSpan(
         alignment: PlaceholderAlignment.middle,
         child: Math.tex(textContent,
-            textStyle: const TextStyle(fontSize: 16, color: Colors.white)),
+            textStyle: const TextStyle(fontSize: 16, color: AppTheme.textPrimary)),
       );
 }
 
@@ -233,8 +233,8 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
       floatingActionButton: _isFullScreen || _isLoading
           ? null
           : FloatingActionButton.extended(
-              backgroundColor: AppTheme.accentBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: AppTheme.accent,
+              foregroundColor: AppTheme.onAccent,
               icon: const Icon(Icons.chat_bubble_outline, size: 20),
               label: const Text('Chat',
                   style: TextStyle(fontWeight: FontWeight.w700)),
@@ -291,13 +291,13 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                     children: [
                       IconButton(
                         icon: const Icon(Icons.fullscreen,
-                            color: Colors.white70, size: 20),
+                            color: AppTheme.textSecondary, size: 20),
                         onPressed: () =>
                             setState(() => _isFullScreen = true),
                       ),
                       IconButton(
                         icon: const Icon(Icons.rotate_right,
-                            color: Colors.white70, size: 20),
+                            color: AppTheme.textSecondary, size: 20),
                         onPressed: () => setState(
                             () => _quarterTurns = (_quarterTurns + 1) % 4),
                       ),
@@ -306,7 +306,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         child: Text(
                           '$_currentPage / $_pageCount',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -327,7 +327,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                 elevation: 0,
                 onPressed: () => setState(() => _isFullScreen = false),
                 child: const Icon(Icons.fullscreen_exit,
-                    color: Colors.white),
+                    color: AppTheme.textPrimary),
               ),
             ),
           // Loading screen
@@ -350,7 +350,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                         child: const Icon(
                           Icons.picture_as_pdf_outlined,
                           size: 90,
-                          color: AppTheme.accentBlue,
+                          color: AppTheme.accent,
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -360,7 +360,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                             .textTheme
                             .titleLarge
                             ?.copyWith(
-                              color: Colors.white70,
+                              color: AppTheme.textSecondary,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.5,
                             ),
@@ -379,7 +379,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                   .textTheme
                                   .bodyMedium
                                   ?.copyWith(
-                                    color: Colors.white54,
+                                    color: AppTheme.textMuted,
                                     fontStyle: FontStyle.italic,
                                   ),
                             ),

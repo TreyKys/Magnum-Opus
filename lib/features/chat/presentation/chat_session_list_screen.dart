@@ -25,7 +25,7 @@ class ChatSessionListScreen extends ConsumerWidget {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         title: const Text('Chat',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -40,13 +40,13 @@ class ChatSessionListScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: AppTheme.accentBlue,
-        foregroundColor: Colors.white,
+        backgroundColor: AppTheme.accent,
+        foregroundColor: AppTheme.onAccent,
         onPressed: () => _newSession(context, ref, atLimit),
         child: const Icon(Icons.add),
       ),
       body: state.isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.accentBlue))
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.accent))
           : sessions.isEmpty
               ? _EmptyState(onNew: () => _newSession(context, ref, false))
               : Column(
@@ -74,15 +74,15 @@ class ChatSessionListScreen extends ConsumerWidget {
         builder: (_) => AlertDialog(
           backgroundColor: AppTheme.surface,
           title: const Text('Session limit reached',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
           content: const Text(
             'You have 5 active sessions (free tier). Delete or archive one to continue.',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: AppTheme.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK', style: TextStyle(color: Colors.white54)),
+              child: const Text('OK', style: TextStyle(color: AppTheme.textMuted)),
             ),
             TextButton(
               onPressed: () {
@@ -91,7 +91,7 @@ class ChatSessionListScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const UpgradeScreen()));
               },
               child: const Text('Learn about Pro',
-                  style: TextStyle(color: AppTheme.accentBlueLight, fontWeight: FontWeight.w700)),
+                  style: TextStyle(color: AppTheme.accentLight, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -131,11 +131,11 @@ class _SessionCard extends ConsumerWidget {
       child: Container(
         decoration: BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppTheme.border),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           onLongPress: () => _showOptions(context, ref),
           child: Padding(
@@ -146,12 +146,12 @@ class _SessionCard extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppTheme.accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Icon(
                     hasDoc ? Icons.description_outlined : Icons.chat_bubble_outline,
-                    color: AppTheme.accentBlue,
+                    color: AppTheme.accent,
                     size: 20,
                   ),
                 ),
@@ -168,13 +168,13 @@ class _SessionCard extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimary,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14),
                             ),
                           ),
                           if (session.isPinned)
-                            const Icon(Icons.push_pin, color: AppTheme.accentBlue, size: 14),
+                            const Icon(Icons.push_pin, color: AppTheme.accent, size: 14),
                         ],
                       ),
                       const SizedBox(height: 3),
@@ -182,7 +182,7 @@ class _SessionCard extends ConsumerWidget {
                         hasDoc
                             ? 'RAG · ${session.attachedDocumentTitle ?? 'Document'}'
                             : 'General chat',
-                        style: const TextStyle(color: AppTheme.accentBlueLight, fontSize: 10),
+                        style: const TextStyle(color: AppTheme.accentLight, fontSize: 10),
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -219,40 +219,40 @@ class _SessionCard extends ConsumerWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  color: AppTheme.border, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 8),
             ListTile(
               leading: Icon(
                 session.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
-                color: AppTheme.accentBlueLight,
+                color: AppTheme.accentLight,
               ),
               title: Text(session.isPinned ? 'Unpin' : 'Pin',
-                  style: const TextStyle(color: Colors.white)),
+                  style: const TextStyle(color: AppTheme.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 notifier.pinSession(session.id, !session.isPinned);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.drive_file_rename_outline, color: Colors.white70),
-              title: const Text('Rename', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.drive_file_rename_outline, color: AppTheme.textSecondary),
+              title: const Text('Rename', style: TextStyle(color: AppTheme.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 _showRename(context, notifier);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.archive_outlined, color: Colors.white70),
-              title: const Text('Archive', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.archive_outlined, color: AppTheme.textSecondary),
+              title: const Text('Archive', style: TextStyle(color: AppTheme.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 notifier.archiveSession(session.id);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Color(0xFFFF5252)),
-              title: const Text('Delete', style: TextStyle(color: Color(0xFFFF5252))),
+              leading: const Icon(Icons.delete_outline, color: AppTheme.danger),
+              title: const Text('Delete', style: TextStyle(color: AppTheme.danger)),
               onTap: () {
                 Navigator.pop(context);
                 notifier.deleteSession(session.id);
@@ -272,30 +272,30 @@ class _SessionCard extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: const Text('Rename session',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppTheme.textPrimary),
           decoration: InputDecoration(
             filled: true,
             fillColor: AppTheme.background,
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(color: AppTheme.border)),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.accentBlue)),
+                borderRadius: BorderRadius.circular(6),
+                borderSide: const BorderSide(color: AppTheme.accent)),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentBlue, foregroundColor: Colors.white),
+                backgroundColor: AppTheme.accent, foregroundColor: AppTheme.onAccent),
             onPressed: () {
               final name = ctrl.text.trim();
               if (name.isNotEmpty) notifier.renameSession(session.id, name);
@@ -318,18 +318,18 @@ class _LimitBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.accentBlue.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.accentBlue.withOpacity(0.3)),
+        color: AppTheme.accent.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppTheme.accent.withOpacity(0.3)),
       ),
       child: const Row(
         children: [
-          Icon(Icons.info_outline, color: AppTheme.accentBlueLight, size: 16),
+          Icon(Icons.info_outline, color: AppTheme.accentLight, size: 16),
           SizedBox(width: 8),
           Expanded(
             child: Text(
               '5 / 5 sessions used (free tier). Archive or delete one to start new.',
-              style: TextStyle(color: AppTheme.accentBlueLight, fontSize: 12),
+              style: TextStyle(color: AppTheme.accentLight, fontSize: 12),
             ),
           ),
         ],
@@ -356,7 +356,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             const Text('No chat sessions yet',
                 style: TextStyle(
-                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                    color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
             const Text(
               'Start a general conversation or attach a document for RAG-powered answers.',
@@ -366,10 +366,10 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 28),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentBlue,
-                foregroundColor: Colors.white,
+                backgroundColor: AppTheme.accent,
+                foregroundColor: AppTheme.onAccent,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               icon: const Icon(Icons.add, size: 18),
               label: const Text('New Session', style: TextStyle(fontWeight: FontWeight.w700)),

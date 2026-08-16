@@ -63,20 +63,20 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  color: AppTheme.border, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.unarchive_outlined, color: AppTheme.accentBlueLight),
-              title: const Text('Restore session', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.unarchive_outlined, color: AppTheme.accentLight),
+              title: const Text('Restore session', style: TextStyle(color: AppTheme.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 _restore(session.id);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.open_in_new, color: Colors.white70),
-              title: const Text('Open session', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.open_in_new, color: AppTheme.textSecondary),
+              title: const Text('Open session', style: TextStyle(color: AppTheme.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(
@@ -84,8 +84,8 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_forever_outlined, color: Color(0xFFFF5252)),
-              title: const Text('Delete permanently', style: TextStyle(color: Color(0xFFFF5252))),
+              leading: const Icon(Icons.delete_forever_outlined, color: AppTheme.danger),
+              title: const Text('Delete permanently', style: TextStyle(color: AppTheme.danger)),
               onTap: () {
                 Navigator.pop(context);
                 _confirmDelete(context, session);
@@ -104,19 +104,19 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: const Text('Delete permanently?',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
         content: Text(
           '"${session.title}" will be permanently deleted.',
-          style: const TextStyle(color: Colors.white70),
+          style: const TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF5252), foregroundColor: Colors.white),
+                backgroundColor: AppTheme.danger, foregroundColor: AppTheme.textPrimary),
             onPressed: () {
               Navigator.pop(ctx);
               _delete(session.id);
@@ -136,14 +136,14 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Archived Sessions',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.accentBlue))
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.accent))
           : _sessions.isEmpty
               ? Center(
                   child: Padding(
@@ -156,7 +156,7 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
                         SizedBox(height: 16),
                         Text('No archived sessions',
                             style: TextStyle(
-                                color: Colors.white,
+                                color: AppTheme.textPrimary,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600)),
                         SizedBox(height: 8),
@@ -184,11 +184,11 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: AppTheme.border),
                         ),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                           onTap: () => _showOptions(context, session),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -199,8 +199,8 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.06),
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: AppTheme.textPrimary.withOpacity(0.06),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Icon(
                                     hasDoc
@@ -220,7 +220,7 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
-                                            color: Colors.white,
+                                            color: AppTheme.textPrimary,
                                             fontWeight: FontWeight.w600,
                                             fontSize: 14),
                                       ),
@@ -250,7 +250,7 @@ class _ArchivedSessionsScreenState extends State<ArchivedSessionsScreen> {
                                           horizontal: 10, vertical: 6)),
                                   child: const Text('Restore',
                                       style: TextStyle(
-                                          color: AppTheme.accentBlueLight,
+                                          color: AppTheme.accentLight,
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700)),
                                 ),

@@ -27,14 +27,14 @@ class ComplexityDial extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: AppTheme.accentBlue.withOpacity(0.15),
+                color: AppTheme.accent.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.accentBlue.withOpacity(0.4)),
+                border: Border.all(color: AppTheme.accent.withOpacity(0.4)),
               ),
               child: Text(
                 complexityLabel(complexity),
                 style: const TextStyle(
-                  color: AppTheme.accentBlueLight,
+                  color: AppTheme.accentLight,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                 ),
@@ -71,12 +71,12 @@ class ComplexityMiniDial extends ConsumerWidget {
 
     return Row(
       children: [
-        const Icon(Icons.psychology_outlined, color: AppTheme.accentBlueLight, size: 16),
+        const Icon(Icons.psychology_outlined, color: AppTheme.accentLight, size: 16),
         const SizedBox(width: 6),
         Text(
           complexityLabel(complexity),
           style: const TextStyle(
-            color: AppTheme.accentBlueLight,
+            color: AppTheme.accentLight,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),

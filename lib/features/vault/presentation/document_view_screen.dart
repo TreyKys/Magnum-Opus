@@ -217,7 +217,7 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
         .replaceFirst('__B64__', b64);
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF0A0A0A))
+      ..setBackgroundColor(AppTheme.background)
       ..loadHtmlString(html);
   }
 
@@ -232,7 +232,7 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
         .replaceFirst('__B64__', b64);
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF0A0A0A))
+      ..setBackgroundColor(AppTheme.background)
       ..loadHtmlString(html);
   }
 
@@ -244,7 +244,7 @@ class _DocumentViewScreenState extends ConsumerState<DocumentViewScreen>
       final html = _buildEpubHtml(bytes);
       _webViewController = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(const Color(0xFF0A0A0A))
+        ..setBackgroundColor(AppTheme.background)
         ..loadHtmlString(html);
     } catch (_) {
       await _loadChunks();
@@ -392,8 +392,8 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
       floatingActionButton: (!_isLoading && !isIndexing)
           ? FloatingActionButton.extended(
               heroTag: 'chat_fab_doc',
-              backgroundColor: AppTheme.accentBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: AppTheme.accent,
+              foregroundColor: AppTheme.onAccent,
               icon: const Icon(Icons.chat_bubble_outline, size: 20),
               label: const Text('Chat', style: TextStyle(fontWeight: FontWeight.w700)),
               onPressed: () => Navigator.push(
@@ -434,7 +434,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
                               : 'Processing document...')
                           : _loadingMessage,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white70,
+                            color: AppTheme.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -448,7 +448,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
                             _selectedTip,
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white54,
+                                  color: AppTheme.textMuted,
                                   fontStyle: FontStyle.italic,
                                 ),
                           ),
@@ -573,7 +573,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
                     style: TextStyle(
                       fontSize: _txtFontSize,
                       height: 1.72,
-                      color: const Color(0xFFE2E2E2),
+                      color: AppTheme.textPrimary,
                       letterSpacing: 0.15,
                     ),
                   ),
@@ -591,7 +591,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: color.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withOpacity(0.25)),
       ),
       child: Row(
@@ -649,7 +649,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      color: Colors.white,
+                                      color: AppTheme.textPrimary,
                                       fontWeight: FontWeight.w600,
                                       fontSize: 13)),
                             ),
@@ -694,7 +694,7 @@ blockquote{border-left:3px solid #4FC3F7;margin:1em 0;padding-left:1em;color:#AA
             const SizedBox(height: 20),
             const Text('No content extracted yet',
                 style: TextStyle(
-                    color: Colors.white70, fontSize: 17, fontWeight: FontWeight.w600)),
+                    color: AppTheme.textSecondary, fontSize: 17, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             const Text('The document may still be processing.',
                 textAlign: TextAlign.center,
