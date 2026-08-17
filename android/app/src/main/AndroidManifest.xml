@@ -30,10 +30,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- Sample AdMob App ID -->
+        <!-- Live AdMob App ID (NeuroDev Labs / Magnum Opus).
+             Must be the real ID in every build type — a wrong or missing
+             value crashes the app on launch. Test vs live *ads* are
+             controlled by the unit ID in lib/core/ads/ad_config.dart. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-6864344458492366~4158994594"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

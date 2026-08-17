@@ -64,10 +64,10 @@ class SubscriptionService {
     }
   }
 
-  static Future<CustomerInfo> purchasePackage(Package package) async {
-    final result = await Purchases.purchasePackage(package);
-    return result.customerInfo;
-  }
+  /// Note: `Purchases.purchasePackage` resolves to [CustomerInfo] directly in
+  /// purchases_flutter 8.x — there is no wrapper result object to unwrap.
+  static Future<CustomerInfo> purchasePackage(Package package) =>
+      Purchases.purchasePackage(package);
 
   static Future<CustomerInfo> restorePurchases() async {
     return await Purchases.restorePurchases();
