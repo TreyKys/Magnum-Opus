@@ -214,6 +214,14 @@ class SessionMessagesNotifier
         );
       }
 
+      // The AI helpers return friendly failure text instead of throwing, so
+      // give the query back rather than charging for an outage. See
+      // chat_provider._appendAiMessage.
+      if (isRetryableAiFailure(aiText) &&
+          !ref.read(subscriptionProvider).isPro) {
+        await ref.read(energyProvider.notifier).refundOne();
+      }
+
       final aiMsg = StandaloneMessage(
         id: _uuid.v4(),
         sessionId: sessionId,

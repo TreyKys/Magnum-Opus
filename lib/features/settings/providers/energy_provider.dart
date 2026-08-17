@@ -47,6 +47,15 @@ class EnergyNotifier extends Notifier<int> {
     }
   }
 
+  /// Returns the single query taken for a request that failed before producing
+  /// an answer. Charging for an outage the user did not cause is the same
+  /// unfairness as billing an audio credit for a failed transcription.
+  Future<void> refundOne() async {
+    final newValue = state + 1;
+    await _prefs.setInt(_energyKey, newValue);
+    state = newValue;
+  }
+
   /// Flat reward: 1 ad = 2 queries, always. No counters, no compounding.
   Future<void> refillEnergy() async {
     final newValue = state + adReward;

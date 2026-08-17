@@ -6,6 +6,8 @@ import 'package:magnum_opus/core/ai/ai_service.dart';
 import 'package:magnum_opus/core/ai/gemini_file_service.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
+import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
 import 'package:magnum_opus/features/vault/models/chat_message.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 
@@ -171,6 +173,13 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
   Future<void> _appendAiMessage(String text) async {
+    // generateRAGResponse never throws — it returns friendly failure text. So
+    // detect that here and hand the query back rather than charging for an
+    // outage the user did not cause.
+    if (isRetryableAiFailure(text) && !ref.read(subscriptionProvider).isPro) {
+      await ref.read(energyProvider.notifier).refundOne();
+    }
+
     final msg = ChatMessage(
       id: _uuid.v4(),
       documentId: arg,
