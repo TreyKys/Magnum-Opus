@@ -5,27 +5,43 @@ import 'package:magnum_opus/core/subscription/subscription_service.dart';
 
 class SubscriptionState {
   final bool isPro;
-  final bool isLoading;
+
+  /// A purchase or restore round-trip is in flight. This — and only this —
+  /// disables the buy buttons.
+  ///
+  /// Deliberately separate from [isInitializing]: a single shared "loading"
+  /// flag meant a slow or hung startup fetch left the buy button permanently
+  /// stuck on "Processing…", which is exactly the bug this split fixes.
+  final bool isBusy;
+
+  /// The first entitlement/offerings fetch has not settled yet. Informational
+  /// only — it must never gate purchasing, because offerings can arrive from
+  /// [SubscriptionNotifier.refreshOfferings] independently of this flag.
+  final bool isInitializing;
+
   final Offerings? offerings;
   final String? error;
 
   const SubscriptionState({
     this.isPro = false,
-    this.isLoading = true,
+    this.isBusy = false,
+    this.isInitializing = true,
     this.offerings,
     this.error,
   });
 
   SubscriptionState copyWith({
     bool? isPro,
-    bool? isLoading,
+    bool? isBusy,
+    bool? isInitializing,
     Offerings? offerings,
     String? error,
     bool clearError = false,
   }) {
     return SubscriptionState(
       isPro: isPro ?? this.isPro,
-      isLoading: isLoading ?? this.isLoading,
+      isBusy: isBusy ?? this.isBusy,
+      isInitializing: isInitializing ?? this.isInitializing,
       offerings: offerings ?? this.offerings,
       error: clearError ? null : (error ?? this.error),
     );
@@ -54,7 +70,7 @@ class SubscriptionNotifier extends Notifier<SubscriptionState> {
   Future<void> _init() async {
     if (!SubscriptionService.isConfigured) {
       // RevenueCat API key not set — app runs on the free tier.
-      state = state.copyWith(isLoading: false, isPro: false);
+      state = state.copyWith(isInitializing: false, isPro: false);
       return;
     }
 
@@ -62,15 +78,27 @@ class SubscriptionNotifier extends Notifier<SubscriptionState> {
     SubscriptionService.addCustomerInfoListener(_listener!);
 
     try {
-      final info = await SubscriptionService.getCustomerInfo();
-      final offerings = await SubscriptionService.getOfferings();
+      // Fetched together rather than in sequence: entitlement state and
+      // offerings are independent, and serialising them meant a slow
+      // getCustomerInfo() also delayed the price. Both calls time out
+      // internally, so this always settles.
+      final results = await Future.wait([
+        SubscriptionService.getCustomerInfo(),
+        SubscriptionService.getOfferings(),
+      ]);
+
+      final info = results[0] as CustomerInfo?;
+      final offerings = results[1] as Offerings?;
+
       state = state.copyWith(
-        isLoading: false,
+        isInitializing: false,
         isPro: info != null && SubscriptionService.hasProEntitlement(info),
         offerings: offerings,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      // Never leave the UI initialising — the buy button does not depend on
+      // this flag, but the spinner does.
+      state = state.copyWith(isInitializing: false);
     }
   }
 
@@ -83,34 +111,34 @@ class SubscriptionNotifier extends Notifier<SubscriptionState> {
   Future<void> refreshOfferings() async {
     try {
       final offerings = await SubscriptionService.getOfferings();
-      state = state.copyWith(offerings: offerings);
+      if (offerings != null) {
+        state = state.copyWith(offerings: offerings, isInitializing: false);
+      }
     } catch (_) {}
   }
 
   /// Returns true if the purchase resulted in an active Pro entitlement.
-  /// Returns false on cancellation or failure (error is set on state,
-  /// except for user-cancelled purchases which fail silently).
+  /// Returns false on cancellation or failure; [SubscriptionState.error] is
+  /// set for real failures but left null when the user simply cancelled.
   Future<bool> purchase(Package package) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    if (state.isBusy) return false; // ignore double taps
+    state = state.copyWith(isBusy: true, clearError: true);
     try {
       final info = await SubscriptionService.purchasePackage(package);
       final isPro = SubscriptionService.hasProEntitlement(info);
-      state = state.copyWith(isLoading: false, isPro: isPro);
+      state = state.copyWith(isBusy: false, isPro: isPro);
       return isPro;
     } on PlatformException catch (e) {
       final code = PurchasesErrorHelper.getErrorCode(e);
       if (code == PurchasesErrorCode.purchaseCancelledError) {
-        state = state.copyWith(isLoading: false);
+        state = state.copyWith(isBusy: false);
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: 'Purchase failed. Please try again.',
-        );
+        state = state.copyWith(isBusy: false, error: _messageFor(code));
       }
       return false;
     } catch (e) {
       state = state.copyWith(
-        isLoading: false,
+        isBusy: false,
         error: 'Purchase failed. Please try again.',
       );
       return false;
@@ -118,18 +146,40 @@ class SubscriptionNotifier extends Notifier<SubscriptionState> {
   }
 
   Future<bool> restore() async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    if (state.isBusy) return false;
+    state = state.copyWith(isBusy: true, clearError: true);
     try {
       final info = await SubscriptionService.restorePurchases();
       final isPro = SubscriptionService.hasProEntitlement(info);
-      state = state.copyWith(isLoading: false, isPro: isPro);
+      state = state.copyWith(isBusy: false, isPro: isPro);
       return isPro;
     } catch (e) {
       state = state.copyWith(
-        isLoading: false,
+        isBusy: false,
         error: 'Could not restore purchases. Please try again.',
       );
       return false;
+    }
+  }
+
+  /// Store-billing failures are opaque by default; these map the codes users
+  /// realistically hit to something they can act on.
+  String _messageFor(PurchasesErrorCode code) {
+    switch (code) {
+      case PurchasesErrorCode.purchaseNotAllowedError:
+        return 'Purchases are not allowed on this device or account.';
+      case PurchasesErrorCode.paymentPendingError:
+        return 'Payment is pending approval. Pro unlocks once it clears.';
+      case PurchasesErrorCode.productAlreadyPurchasedError:
+        return 'You already own this — try Restore Purchases.';
+      case PurchasesErrorCode.storeProblemError:
+        return 'The Play Store had a problem. Please try again shortly.';
+      case PurchasesErrorCode.networkError:
+        return 'No connection to the store. Check your network and retry.';
+      case PurchasesErrorCode.purchaseInvalidError:
+        return 'This purchase was rejected by the store. Check your payment method.';
+      default:
+        return 'Purchase failed. Please try again.';
     }
   }
 }

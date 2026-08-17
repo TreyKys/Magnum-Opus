@@ -42,10 +42,16 @@ class SubscriptionService {
 
   static bool get isConfigured => _configured;
 
+  /// Cap on the read-only startup calls. Without this a stalled Play Billing
+  /// connection leaves them pending indefinitely, and any UI state keyed off
+  /// their completion never settles. Purchase and restore are deliberately
+  /// NOT capped — the user may sit on the Play sheet for minutes.
+  static const Duration _readTimeout = Duration(seconds: 20);
+
   static Future<CustomerInfo?> getCustomerInfo() async {
     if (!_configured) return null;
     try {
-      return await Purchases.getCustomerInfo();
+      return await Purchases.getCustomerInfo().timeout(_readTimeout);
     } catch (_) {
       return null;
     }
@@ -58,7 +64,7 @@ class SubscriptionService {
   static Future<Offerings?> getOfferings() async {
     if (!_configured) return null;
     try {
-      return await Purchases.getOfferings();
+      return await Purchases.getOfferings().timeout(_readTimeout);
     } catch (_) {
       return null;
     }

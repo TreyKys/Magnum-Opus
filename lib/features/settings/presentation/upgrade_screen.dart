@@ -54,6 +54,20 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
     }
   }
 
+  /// Button text. Distinguishes "a purchase is running" from "prices haven't
+  /// arrived yet" from "this product genuinely isn't configured" — collapsing
+  /// those into one label is what made the stuck-button state so opaque.
+  String _label({
+    required bool isBusy,
+    required bool isInitializing,
+    required bool hasPackage,
+    required String action,
+  }) {
+    if (isBusy) return 'Processing…';
+    if (hasPackage) return action;
+    return isInitializing ? 'Loading…' : 'Unavailable';
+  }
+
   Future<void> _restore() async {
     final notifier = ref.read(subscriptionProvider.notifier);
     final success = await notifier.restore();
@@ -72,7 +86,10 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
   Widget build(BuildContext context) {
     final subState = ref.watch(subscriptionProvider);
     final isPro = subState.isPro;
-    final isLoading = subState.isLoading;
+    // Only an in-flight purchase disables the buttons. Initial loading must
+    // not, or a slow store connection locks the user out of paying.
+    final isBusy = subState.isBusy;
+    final isInitializing = subState.isInitializing;
 
     final monthlyPackage =
         _findPackage(subState.offerings, PackageType.monthly);
@@ -127,12 +144,14 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                 'Priority response speed',
                 'All Free features included',
               ],
-              onBuy: (!isPro && monthlyPackage != null && !isLoading)
+              onBuy: (!isPro && monthlyPackage != null && !isBusy)
                   ? () => _buy(monthlyPackage)
                   : null,
-              buttonLabel: monthlyPackage == null && !isPro
-                  ? 'Unavailable'
-                  : (isLoading ? 'Processing…' : 'Subscribe'),
+              buttonLabel: _label(
+                  isBusy: isBusy,
+                  isInitializing: isInitializing,
+                  hasPackage: monthlyPackage != null,
+                  action: 'Subscribe'),
             ),
             const SizedBox(height: 16),
             _TierCard(
@@ -146,16 +165,18 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                 'No recurring charges',
                 'Priority support',
               ],
-              onBuy: (!isPro && lifetimePackage != null && !isLoading)
+              onBuy: (!isPro && lifetimePackage != null && !isBusy)
                   ? () => _buy(lifetimePackage)
                   : null,
-              buttonLabel: lifetimePackage == null && !isPro
-                  ? 'Unavailable'
-                  : (isLoading ? 'Processing…' : 'Buy Once'),
+              buttonLabel: _label(
+                  isBusy: isBusy,
+                  isInitializing: isInitializing,
+                  hasPackage: lifetimePackage != null,
+                  action: 'Buy Once'),
             ),
             const SizedBox(height: 20),
             TextButton(
-              onPressed: isLoading ? null : _restore,
+              onPressed: isBusy ? null : _restore,
               child: const Text(
                 'Restore Purchases',
                 style: TextStyle(color: AppTheme.accentLight, fontSize: 13),
