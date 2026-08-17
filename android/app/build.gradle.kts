@@ -55,6 +55,15 @@ android {
 
     buildTypes {
         release {
+            // Shrinking stays off — turning R8 on days before a launch risks
+            // stripping something reflective in the ad/billing SDKs. The rules
+            // file (ML Kit script warnings) is wired up now so enabling
+            // isMinifyEnabled later is a one-line change.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+
             signingConfig = if (hasReleaseKeystore) {
                 signingConfigs.getByName("release")
             } else {

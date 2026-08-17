@@ -1,13 +1,18 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'package:flutter/services.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:archive/archive.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:excel/excel.dart';
 import 'package:uuid/uuid.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdfx/pdfx.dart' as pdfx;
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:magnum_opus/core/database/database_helper.dart';
 import 'package:magnum_opus/core/ai/ai_service.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/services/chunking_utils.dart';
 
 // ─── Isolate entry-points (top-level, free functions) ─────────────────────────
 // Everything that touches `archive`, `html`, `excel`, or `syncfusion` MUST
@@ -26,11 +31,21 @@ Future<List<Map<String, dynamic>>> _extractPdfChunk(
   final int startPage = params['startPage'];
   final int endPage = params['endPage'];
   final String documentId = params['documentId'];
+  final RootIsolateToken token = params['token'];
+  final String tempDirPath = params['tempDirPath'];
+
+  // ML Kit reaches the platform over a method channel, which a spawned isolate
+  // cannot use until its binary messenger is wired to the root isolate.
+  BackgroundIsolateBinaryMessenger.ensureInitialized(token);
 
   final file = File(filePath);
   if (!file.existsSync()) return [];
   final bytes = file.readAsBytesSync();
   PdfDocument? doc;
+  // Both are opened lazily — a text-native PDF should never pay the cost of
+  // loading a rasteriser or an OCR model.
+  pdfx.PdfDocument? pdfxDoc;
+  TextRecognizer? textRecognizer;
   final chunks = <Map<String, dynamic>>[];
 
   try {
@@ -41,15 +56,66 @@ Future<List<Map<String, dynamic>>> _extractPdfChunk(
       try {
         text = extractor.extractText(startPageIndex: i - 1, endPageIndex: i - 1);
       } catch (_) {}
-      chunks.add({
-        'id': '${DateTime.now().microsecondsSinceEpoch}$i',
-        'document_id': documentId,
-        'page_number': i,
-        'extracted_text': text,
-      });
+      text = text.trim();
+
+      // No embedded text means a scanned page. Rasterise it and OCR it rather
+      // than storing nothing — this is the difference between a scanned PDF
+      // being queryable and being dead weight.
+      if (text.isEmpty) {
+        File? tempImgFile;
+        try {
+          pdfxDoc ??= await pdfx.PdfDocument.openFile(filePath);
+          final page = await pdfxDoc.getPage(i);
+          try {
+            final pageImage = await page.render(
+              width: page.width * 2, // ~2x for legible OCR input
+              height: page.height * 2,
+              format: pdfx.PdfPageImageFormat.png,
+            );
+            if (pageImage != null) {
+              tempImgFile = File('$tempDirPath/${_uuid.v4()}_page_$i.png');
+              await tempImgFile.writeAsBytes(pageImage.bytes);
+
+              // One recognizer per isolate batch — the model load is expensive.
+              textRecognizer ??=
+                  TextRecognizer(script: TextRecognitionScript.latin);
+              final recognized = await textRecognizer
+                  .processImage(InputImage.fromFilePath(tempImgFile.path));
+              text = recognized.text.trim();
+            }
+          } finally {
+            await page.close();
+          }
+        } catch (_) {
+          // OCR is best-effort: a failed page is skipped, never fatal.
+        } finally {
+          // Always remove the rendered PNG, even when OCR threw, or failed
+          // pages steadily leak images into the temp directory.
+          if (tempImgFile != null && tempImgFile.existsSync()) {
+            await tempImgFile.delete();
+          }
+        }
+      }
+
+      if (text.isEmpty) continue;
+
+      // Overlapping ~500-token chunks. page_number stays the true PDF page for
+      // every sub-chunk, which is what the Division System's brain_pages and
+      // excludePages depend on.
+      final textChunks = ChunkingUtils.strictChunkText(text);
+      for (int c = 0; c < textChunks.length; c++) {
+        chunks.add({
+          'id': '${DateTime.now().microsecondsSinceEpoch}_${i}_$c',
+          'document_id': documentId,
+          'page_number': i,
+          'extracted_text': textChunks[c],
+        });
+      }
     }
   } finally {
     doc?.dispose();
+    if (pdfxDoc != null) await pdfxDoc.close();
+    if (textRecognizer != null) await textRecognizer.close();
   }
   return chunks;
 }
@@ -400,6 +466,12 @@ class DocumentExtractionService {
         await DatabaseHelper.instance.getExtractedPageCount(document.id);
     if (dbCount >= totalPages) return;
 
+    // Both must be obtained on the main isolate and handed to the workers:
+    // RootIsolateToken.instance is null off the root isolate, and
+    // getTemporaryDirectory() itself needs a platform channel.
+    final tempDir = await getTemporaryDirectory();
+    final token = RootIsolateToken.instance!;
+
     final futures = <Future<void>>[];
     for (int i = 1; i <= totalPages; i += _pdfChunkPages) {
       final start = i;
@@ -409,6 +481,8 @@ class DocumentExtractionService {
         'startPage': start,
         'endPage': end,
         'documentId': document.id,
+        'token': token,
+        'tempDirPath': tempDir.path,
       }));
     }
     await Future.wait(futures);

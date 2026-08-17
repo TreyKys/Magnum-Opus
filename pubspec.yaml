@@ -59,6 +59,9 @@ dependencies:
   webview_flutter: ^4.13.1
   purchases_flutter: ^8.4.0
   image_picker: ^1.1.2
+  # OCR fallback for scanned PDFs: pdfx rasterises a page, ML Kit reads it.
+  pdfx: ^2.9.2
+  google_mlkit_text_recognition: ^0.16.0
 
 dev_dependencies:
   flutter_test:

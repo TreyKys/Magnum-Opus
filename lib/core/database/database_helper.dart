@@ -296,16 +296,23 @@ CREATE TABLE standalone_messages (
     );
   }
 
-  /// Returns page numbers of the top [limit] content-dense chunks (by character count).
-  /// Used to identify brain pages for the Division System.
+  /// Returns the [limit] most content-dense *pages* for the Division System's
+  /// brain subset.
+  ///
+  /// Aggregates before ranking: a page is stored as several overlapping chunks,
+  /// so ranking rows directly would return the same page repeatedly and yield
+  /// far fewer than [limit] distinct pages. GROUP BY also makes the score the
+  /// page's total text rather than whichever single chunk happened to be
+  /// longest.
   Future<List<int>> getTopContentPages(String documentId,
       {int limit = 50}) async {
     final db = await instance.database;
     final result = await db.rawQuery('''
-      SELECT page_number
+      SELECT page_number, SUM(LENGTH(extracted_text)) AS total_chars
       FROM document_chunks
       WHERE document_id = ?
-      ORDER BY LENGTH(extracted_text) DESC
+      GROUP BY page_number
+      ORDER BY total_chars DESC
       LIMIT ?
     ''', [documentId, limit]);
     return result.map((r) => r['page_number'] as int).toList();

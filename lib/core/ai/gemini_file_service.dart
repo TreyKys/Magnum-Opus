@@ -117,8 +117,9 @@ class GeminiFileService {
       Map<String, dynamic> params) async {
     final Uint8List allBytes = params['bytes'] as Uint8List;
     final List<int> pages = (params['pages'] as List).cast<int>();
-    // Sort pages into document order for the output PDF
-    final sorted = List<int>.from(pages)..sort();
+    // Deduplicate as well as sort: a repeated page number would otherwise be
+    // copied into the brain PDF twice, wasting tokens on every query.
+    final sorted = pages.toSet().toList()..sort();
 
     PdfDocument? src;
     PdfDocument? dst;
