@@ -173,8 +173,11 @@ $userQuery
 
         Content newestContent;
         if (hasFileUri) {
+          // google_generative_ai exposes file references as FilePart(Uri) —
+          // there is no FileData type, and no mime type is passed here: the
+          // Files API already recorded application/pdf at upload time.
           newestContent = Content.multi([
-            FileData('application/pdf', fileUri!),
+            FilePart(Uri.parse(fileUri!)),
             TextPart(prompt),
             if (imageBytes != null) DataPart('image/png', imageBytes),
           ]);

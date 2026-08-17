@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' show Offset;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
@@ -125,11 +126,28 @@ class GeminiFileService {
       src = PdfDocument(inputBytes: allBytes);
       dst = PdfDocument();
       final total = src.pages.count;
+
+      // syncfusion_flutter_pdf has no importPage/merge API. The supported way
+      // to copy a page across documents is to snapshot it as a PdfTemplate and
+      // draw that onto a fresh page. Each page gets its own section so the
+      // copy keeps the source page's exact dimensions — a new PdfDocument
+      // otherwise defaults every page to A4, which would crop or letterbox
+      // anything that isn't A4. Text remains extractable through this path.
       for (final pageNum in sorted) {
-        if (pageNum >= 1 && pageNum <= total) {
-          dst.pages.importPage(src.pages[pageNum - 1]);
-        }
+        if (pageNum < 1 || pageNum > total) continue;
+        final srcPage = src.pages[pageNum - 1];
+        final pageSize = srcPage.size;
+        final template = srcPage.createTemplate();
+
+        final section = dst.sections!.add();
+        section.pageSettings.size = pageSize;
+        section.pageSettings.margins.all = 0;
+        section.pages
+            .add()
+            .graphics
+            .drawPdfTemplate(template, Offset.zero, pageSize);
       }
+
       return Uint8List.fromList(await dst.save());
     } finally {
       dst?.dispose();
