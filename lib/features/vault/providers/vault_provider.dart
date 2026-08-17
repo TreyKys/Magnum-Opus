@@ -120,6 +120,57 @@ class VaultNotifier extends Notifier<VaultState> {
     } catch (_) {}
   }
 
+  // ─── Background-ingest failure cleanup ───────────────────────────────────
+
+  /// Rolls back an ingest whose background work never produced chunks.
+  ///
+  /// Audio transcription and URL scraping insert a placeholder `documents`
+  /// row up front so the item shows as "processing". If the background task
+  /// then fails — unreachable host, invalid TLS certificate, no readable
+  /// content, transcription error — that row would otherwise survive with
+  /// zero chunks, and every later chat against it reports "still being
+  /// processed" forever. Removing it is the honest outcome: the ingest did
+  /// not happen.
+  ///
+  /// [refundAudioCredit] returns the free-tier transcription credit that
+  /// [ingestAudio] consumes optimistically before the work is attempted.
+  Future<void> _failIngest(
+    String id, {
+    String? filePath,
+    bool refundAudioCredit = false,
+  }) async {
+    try {
+      await DatabaseHelper.instance.deleteDocument(id);
+    } catch (_) {}
+
+    // Drop the copied source file so a failed ingest leaves nothing behind.
+    if (filePath != null && !filePath.startsWith('http')) {
+      try {
+        final f = File(filePath);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
+
+    if (refundAudioCredit) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final restored =
+            state.audioIngestsUsed > 0 ? state.audioIngestsUsed - 1 : 0;
+        await prefs.setInt(_audioIngestKey, restored);
+        state = state.copyWith(audioIngestsUsed: restored);
+      } catch (_) {}
+    }
+
+    final newSet = Set<String>.from(state.indexingDocumentIds)..remove(id);
+    List<DocumentModel> docs;
+    try {
+      docs = await DatabaseHelper.instance.getAllDocuments();
+    } catch (_) {
+      docs = state.documents.where((d) => d.id != id).toList();
+    }
+    state = state.copyWith(documents: docs, indexingDocumentIds: newSet);
+  }
+
   // ─── Ingest: Audio (MP3, M4A, WAV) ──────────────────────────────────────
 
   /// Returns true if ingestion started, false if blocked (free-tier limit
@@ -184,9 +235,10 @@ class VaultNotifier extends Notifier<VaultState> {
         final newSet = Set<String>.from(state.indexingDocumentIds)..remove(id);
         final refreshed = await DatabaseHelper.instance.getAllDocuments();
         state = state.copyWith(documents: refreshed, indexingDocumentIds: newSet);
-      }).catchError((_) {
-        final newSet = Set<String>.from(state.indexingDocumentIds)..remove(id);
-        state = state.copyWith(indexingDocumentIds: newSet);
+      }).catchError((_) async {
+        // Transcription failed — drop the stub and hand back the credit.
+        await _failIngest(id,
+            filePath: savedFile.path, refundAudioCredit: !isPro);
       });
       return true;
     } catch (_) {
@@ -229,9 +281,11 @@ class VaultNotifier extends Notifier<VaultState> {
         final newSet = Set<String>.from(state.indexingDocumentIds)..remove(id);
         final refreshed = await DatabaseHelper.instance.getAllDocuments();
         state = state.copyWith(documents: refreshed, indexingDocumentIds: newSet);
-      }).catchError((_) {
-        final newSet = Set<String>.from(state.indexingDocumentIds)..remove(id);
-        state = state.copyWith(indexingDocumentIds: newSet);
+      }).catchError((_) async {
+        // Unreachable host, invalid TLS certificate, non-2xx, or no readable
+        // content — drop the stub rather than leaving a document that can
+        // never answer anything.
+        await _failIngest(id);
       });
     } catch (_) {}
   }
