@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:markdown_widget/markdown_widget.dart';
+import 'package:magnum_opus/core/ads/ad_config.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/core/theme/markdown_theme.dart';
 import 'package:magnum_opus/features/chat/models/chat_session_model.dart';
@@ -75,7 +76,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
   void _loadAd() {
     setState(() => _loadingAd = true);
     RewardedAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/5224354917',
+      adUnitId: AdConfig.rewardedUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) => setState(() { _rewardedAd = ad; _loadingAd = false; }),

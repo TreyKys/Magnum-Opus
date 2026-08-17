@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:markdown_widget/markdown_widget.dart';
+import 'package:magnum_opus/core/ads/ad_config.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/core/theme/markdown_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
@@ -49,7 +50,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   void _loadAd() {
     setState(() => _loadingAd = true);
     RewardedAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/5224354917',
+      adUnitId: AdConfig.rewardedUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
