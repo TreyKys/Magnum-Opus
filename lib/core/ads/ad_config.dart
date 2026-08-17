@@ -21,17 +21,18 @@ class AdConfig {
       'ca-app-pub-3940256099942544/5224354917';
   static const String _testRewardedIos =
       'ca-app-pub-3940256099942544/1712485313';
+  static const String _testRewardedInterstitialAndroid =
+      'ca-app-pub-3940256099942544/5354046379';
+  static const String _testRewardedInterstitialIos =
+      'ca-app-pub-3940256099942544/6978759866';
 
   // ─── Live units — AdMob app ca-app-pub-6864344458492366~4158994594 ─────
   /// `Free_Tier_Rewd_Ad` — backs the "Watch Ad +2" energy refill.
   static const String _liveRewardedAndroid =
       'ca-app-pub-6864344458492366/2702442692';
 
-  /// `Free_Tier_RewInt_Ad` — a rewarded *interstitial* unit that exists in
-  /// the AdMob account but is NOT wired up: the app only ever loads
-  /// [RewardedAd], never RewardedInterstitialAd. Recorded here so the ID
-  /// isn't lost if we later add a second placement.
-  static const String liveRewardedInterstitialAndroid =
+  /// `Free_Tier_RewInt_Ad` — rewarded interstitial offered on chat exit.
+  static const String _liveRewardedInterstitialAndroid =
       'ca-app-pub-6864344458492366/6346174231';
 
   // No iOS AdMob app exists yet — there is no ios/ project in this repo.
@@ -43,21 +44,13 @@ class AdConfig {
   static String get _testRewarded =>
       _isIos ? _testRewardedIos : _testRewardedAndroid;
 
-  /// Rewarded unit backing the "Watch Ad +2" energy refill.
+  /// Rewarded unit backing the "Watch Ad" energy refill button.
   static String get rewardedUnitId {
     if (kDebugMode) return _testRewarded;
 
-    // Optional override, so a unit can be rotated without shipping code.
-    final overrideKey =
-        _isIos ? 'ADMOB_REWARDED_UNIT_IOS' : 'ADMOB_REWARDED_UNIT_ANDROID';
-    String? override;
-    try {
-      override = dotenv.env[overrideKey];
-    } catch (_) {
-      // dotenv not loaded (e.g. a widget test) — ignore and use the default.
-      override = null;
-    }
-    if (override != null && override.trim().isNotEmpty) return override.trim();
+    final override = _envOverride(
+        _isIos ? 'ADMOB_REWARDED_UNIT_IOS' : 'ADMOB_REWARDED_UNIT_ANDROID');
+    if (override != null) return override;
 
     final live = _isIos ? _liveRewardedIos : _liveRewardedAndroid;
     if (live == null || live.isEmpty) {
@@ -68,8 +61,35 @@ class AdConfig {
     return live;
   }
 
-  /// True when the ID actually in use is one of Google's samples. Handy for a
+  static String get _testRewardedInterstitial => _isIos
+      ? _testRewardedInterstitialIos
+      : _testRewardedInterstitialAndroid;
+
+  /// Rewarded interstitial offered when leaving a chat. No iOS unit exists
+  /// yet, so iOS falls back to the test unit rather than shipping a wrong ID.
+  static String get rewardedInterstitialUnitId {
+    if (kDebugMode || _isIos) return _testRewardedInterstitial;
+
+    final override = _envOverride('ADMOB_REWARDED_INTERSTITIAL_ANDROID');
+    if (override != null) return override;
+
+    return _liveRewardedInterstitialAndroid;
+  }
+
+  /// Reads a `.env` override, or null when absent/blank/unavailable.
+  static String? _envOverride(String key) {
+    try {
+      final v = dotenv.env[key];
+      if (v != null && v.trim().isNotEmpty) return v.trim();
+    } catch (_) {
+      // dotenv not loaded (e.g. a widget test) — treat as absent.
+    }
+    return null;
+  }
+
+  /// True when either ID in use is one of Google's samples. Handy for a
   /// pre-release smoke check: this must be false in a store build.
   static bool get isUsingTestUnits =>
-      rewardedUnitId.startsWith('ca-app-pub-3940256099942544');
+      rewardedUnitId.startsWith('ca-app-pub-3940256099942544') ||
+      rewardedInterstitialUnitId.startsWith('ca-app-pub-3940256099942544');
 }

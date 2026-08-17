@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:magnum_opus/core/ads/ad_config.dart';
+import 'package:magnum_opus/core/ads/rewarded_interstitial_controller.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/core/theme/markdown_theme.dart';
 import 'package:magnum_opus/features/chat/models/chat_session_model.dart';
@@ -40,10 +41,16 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
   RewardedAd? _rewardedAd;
   bool _loadingAd = false;
 
+  /// See document_chat_screen.dart — the exit ad is only offered after a real
+  /// exchange, and _exiting guards against running the exit path twice.
+  bool _hadConversation = false;
+  bool _exiting = false;
+
   @override
   void initState() {
     super.initState();
     _loadAd();
+    RewardedInterstitialController.instance.preload();
     if (widget.initialImageBytes != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _sendImage(widget.initialImageBytes!);
@@ -62,7 +69,27 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
           'What\'s in this image?',
           imageBytes: bytes,
         );
+    _hadConversation = true;
     Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
+  }
+
+  /// Single exit path for the app-bar arrow and the system back gesture.
+  /// Always pops, whatever the ad does.
+  Future<void> _handleExit() async {
+    if (_exiting) return;
+    _exiting = true;
+    try {
+      await RewardedInterstitialController.instance.maybeShowOnExit(
+        context: context,
+        energy: ref.read(energyProvider.notifier),
+        isPro: ref.read(subscriptionProvider).isPro,
+        hadConversation: _hadConversation,
+      );
+    } catch (_) {
+      // Swallowed deliberately — see finally.
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -117,6 +144,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
           text,
           attachedDocumentId: session?.attachedDocumentId,
         );
+    _hadConversation = true;
     _inputController.clear();
     Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
   }
@@ -159,14 +187,21 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
             ))
         .toList();
 
-    return Scaffold(
+    return PopScope(
+      // canPop false so the system back gesture also routes through
+      // _handleExit, which always pops.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleExit();
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.surface,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _handleExit,
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,6 +280,7 @@ class _StandaloneChatScreenState extends ConsumerState<StandaloneChatScreen> {
                   onSend: _send,
                 ),
         ],
+      ),
       ),
     );
   }

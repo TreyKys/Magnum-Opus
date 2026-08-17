@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:magnum_opus/core/ads/ad_config.dart';
+import 'package:magnum_opus/core/ads/rewarded_interstitial_controller.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/core/theme/markdown_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
@@ -33,10 +34,19 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   RewardedAd? _rewardedAd;
   bool _loadingAd = false;
 
+  /// True once the user has actually sent something this visit. The exit ad is
+  /// only offered after a real exchange — opening a chat and immediately
+  /// backing out should never be met with an ad.
+  bool _hadConversation = false;
+
+  /// Guards the exit path so a double-tap on back cannot run it twice.
+  bool _exiting = false;
+
   @override
   void initState() {
     super.initState();
     _loadAd();
+    RewardedInterstitialController.instance.preload();
   }
 
   @override
@@ -90,8 +100,31 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
       ref.read(energyProvider.notifier).consumeEnergy();
     }
     ref.read(chatProvider(widget.document.id).notifier).sendMessage(text);
+    _hadConversation = true;
     _inputController.clear();
     Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
+  }
+
+  /// Single exit path for both the app-bar arrow and the system back gesture.
+  /// Offers the bonus-query ad, then always pops — a failure anywhere in the
+  /// ad path must never leave the user stuck on this screen.
+  Future<void> _handleExit() async {
+    if (_exiting) return;
+    _exiting = true;
+    try {
+      await RewardedInterstitialController.instance.maybeShowOnExit(
+        context: context,
+        // Captured now: this State is about to be torn down, so the reward
+        // callback must not reach through a possibly-disposed ref.
+        energy: ref.read(energyProvider.notifier),
+        isPro: ref.read(subscriptionProvider).isPro,
+        hadConversation: _hadConversation,
+      );
+    } catch (_) {
+      // Swallowed deliberately — see finally.
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
   }
 
   void _scrollToBottom() {
@@ -116,14 +149,21 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     });
 
-    return Scaffold(
+    return PopScope(
+      // canPop is false so the system back gesture routes through _handleExit
+      // too, rather than only the app-bar arrow. _handleExit always pops.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleExit();
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.surface,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _handleExit,
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,6 +240,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                   onSend: _send,
                 ),
         ],
+      ),
       ),
     );
   }

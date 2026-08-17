@@ -8,8 +8,11 @@ class EnergyNotifier extends Notifier<int> {
   static const String _lastResetKey = 'last_energy_reset_date';
 
   static const int _maxFreeEnergy = 5;
-  // Flat rate: every rewarded ad grants exactly 2 queries — no exponential compounding.
-  static const int _adReward = 2;
+
+  /// Flat rate: every rewarded ad grants exactly this many queries — no
+  /// exponential compounding. Public so ad UIs can state the reward without
+  /// hardcoding a number that could drift from what is actually granted.
+  static const int adReward = 2;
 
   late SharedPreferences _prefs;
 
@@ -46,7 +49,7 @@ class EnergyNotifier extends Notifier<int> {
 
   /// Flat reward: 1 ad = 2 queries, always. No counters, no compounding.
   Future<void> refillEnergy() async {
-    final newValue = state + _adReward;
+    final newValue = state + adReward;
     await _prefs.setInt(_energyKey, newValue);
     state = newValue;
   }
