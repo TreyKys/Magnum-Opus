@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/settings_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -11,6 +15,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settingsState = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
+    final displayName = ref.watch(onboardingProvider).displayName;
+    final isPro = ref.watch(subscriptionProvider).isPro;
 
     return Scaffold(
       appBar: AppBar(
@@ -26,7 +32,7 @@ class SettingsScreen extends ConsumerWidget {
           // ── AI Intelligence ──────────────────────────────────────────────
           _buildSection(
             context,
-            'AI Intelligence',
+            'Response Depth',
             [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -36,14 +42,14 @@ class SettingsScreen extends ConsumerWidget {
                     const Text(
                       'Response Complexity',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Controls how deep and technical the AI responds. Persists across sessions.',
+                      'Controls how deep and technical Magnum responds. Persists across sessions.',
                       style:
                           TextStyle(color: AppTheme.textMuted, fontSize: 12, height: 1.4),
                     ),
@@ -61,9 +67,18 @@ class SettingsScreen extends ConsumerWidget {
             context,
             'Preferences',
             [
+              ListTile(
+                title: const Text('Display Name', style: TextStyle(color: AppTheme.textPrimary)),
+                subtitle: Text(
+                  displayName.isEmpty ? 'Not set' : displayName,
+                  style: const TextStyle(color: AppTheme.textMuted),
+                ),
+                trailing: const Icon(Icons.edit_outlined, color: AppTheme.textMuted, size: 18),
+                onTap: () => _showNameDialog(context, ref, displayName),
+              ),
               SwitchListTile(
                 title: const Text('Haptic Feedback',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: const Text('Vibrations for UI interactions.',
                     style: TextStyle(color: AppTheme.textMuted)),
                 value: settingsState.enableHaptics,
@@ -71,7 +86,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
               SwitchListTile(
                 title: const Text('Reading Tips',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: const Text(
                     'Show helpful tips while loading documents.',
                     style: TextStyle(color: AppTheme.textMuted)),
@@ -89,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
             [
               ListTile(
                 title: const Text('Default Zoom Level',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text(
                   '${settingsState.defaultZoomLevel.toStringAsFixed(2)}x',
                   style: const TextStyle(color: AppTheme.textMuted),
@@ -124,6 +139,37 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
+          // ── Account ───────────────────────────────────────────────────────
+          _buildSection(
+            context,
+            'Account',
+            [
+              ListTile(
+                leading: Icon(
+                  isPro ? Icons.workspace_premium : Icons.bolt_outlined,
+                  color: AppTheme.accent,
+                ),
+                title: Text(
+                  isPro ? 'Magnum Opus Pro' : 'Upgrade to Pro',
+                  style: const TextStyle(
+                      color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isPro
+                      ? 'Unlimited queries & sessions active'
+                      : 'Unlimited queries & sessions',
+                  style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UpgradeScreen()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
           // ── About ─────────────────────────────────────────────────────────
           _buildSection(
             context,
@@ -131,25 +177,77 @@ class SettingsScreen extends ConsumerWidget {
             [
               const ListTile(
                 title: Text('Version',
-                    style: TextStyle(color: Colors.white)),
-                subtitle: Text('2.0.0 (Magnum Opus)',
+                    style: TextStyle(color: AppTheme.textPrimary)),
+                subtitle: Text('3.1.0 (Magnum Opus)',
                     style: TextStyle(color: AppTheme.textMuted)),
               ),
               const ListTile(
-                title: Text('Intelligence Engine',
-                    style: TextStyle(color: Colors.white)),
+                title: Text('Magnum Engine',
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text(
-                    'Gemini 2.5 Flash · Local RAG · SQLite v4',
+                    'Proprietary · Local-first · v4',
                     style: TextStyle(color: AppTheme.textMuted)),
               ),
               const ListTile(
                 title: Text('Supported Formats',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 subtitle: Text(
                     'PDF · EPUB · DOCX · XLSX · PPTX · CSV · TXT · Audio · URL',
                     style: TextStyle(color: AppTheme.textMuted, height: 1.5)),
               ),
             ],
+          ),
+          const SizedBox(height: 40),
+          const _NeuroDevFooter(),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  void _showNameDialog(BuildContext context, WidgetRef ref, String current) {
+    final ctrl = TextEditingController(text: current);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Display Name',
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: AppTheme.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'First name or nickname',
+            hintStyle: const TextStyle(color: AppTheme.textMuted),
+            filled: true,
+            fillColor: AppTheme.background,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: AppTheme.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: AppTheme.accent),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accent,
+              foregroundColor: AppTheme.onAccent,
+              elevation: 0,
+            ),
+            onPressed: () {
+              ref.read(onboardingProvider.notifier).updateDisplayName(ctrl.text.trim());
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -166,17 +264,64 @@ class SettingsScreen extends ConsumerWidget {
           child: Text(
             title.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.accentBlueLight,
+                  color: AppTheme.accentLight,
                 ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppTheme.border),
           ),
           child: Column(children: children),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── NeuroDev Labs footer ─────────────────────────────────────────────────────
+
+class _NeuroDevFooter extends StatelessWidget {
+  const _NeuroDevFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 48,
+          height: 1,
+          color: AppTheme.border,
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'BUILT BY',
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'NeuroDev Labs',
+          style: GoogleFonts.average(
+            color: AppTheme.textPrimary.withOpacity(0.85),
+            fontSize: 22,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Intelligence. Engineered.',
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 11,
+            letterSpacing: 0.5,
+          ),
         ),
       ],
     );

@@ -5,7 +5,7 @@ import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
 import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
 import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
-import 'package:magnum_opus/features/vault/presentation/vault_screen.dart';
+import 'package:magnum_opus/app/main_scaffold.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -17,6 +17,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
+  final TextEditingController _nameController = TextEditingController();
   int _currentPage = 0;
   String _selectedPersona = '';
 
@@ -78,6 +79,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   @override
   void dispose() {
     _pageController.dispose();
+    _nameController.dispose();
     _taglineTimer?.cancel();
     for (final c in _pageControllers) {
       c.dispose();
@@ -100,10 +102,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   void _finish() {
     if (_selectedPersona.isEmpty) return;
-    ref.read(onboardingProvider.notifier).complete(_selectedPersona);
+    ref.read(onboardingProvider.notifier).complete(
+          _selectedPersona,
+          displayName: _nameController.text.trim(),
+        );
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const VaultScreen(),
+        pageBuilder: (_, __, ___) => const MainScaffold(),
         transitionsBuilder: (_, animation, __, child) {
           return FadeTransition(opacity: animation, child: child);
         },
@@ -159,16 +164,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppTheme.accent,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Icon(Icons.bolt, color: Colors.white, size: 24),
+                  child: const Icon(Icons.bolt, color: AppTheme.textPrimary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 const Text(
                   'Magnum Opus',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                   ),
@@ -184,7 +189,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 const Text(
                   'Your ',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     height: 1.2,
@@ -210,7 +215,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                     _taglineWords[_taglineIndex],
                     key: ValueKey(_taglineIndex),
                     style: const TextStyle(
-                      color: AppTheme.accentBlueLight,
+                      color: AppTheme.accentLight,
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
@@ -222,7 +227,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Partner for Docs',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
                 height: 1.2,
@@ -271,7 +276,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Anti-Hallucination',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
@@ -279,14 +284,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Architecture',
               style: TextStyle(
-                color: AppTheme.accentBlueLight,
+                color: AppTheme.accentLight,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Three layers that keep the AI grounded in your documents.',
+              'Three layers that keep Magnum grounded in your documents.',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
             const SizedBox(height: 32),
@@ -294,9 +299,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               step: '01',
               title: 'Global Skeleton',
               description:
-                  'A 200-word macro-summary is generated on ingest and pinned to every query. The AI never loses the overarching context.',
+                  'A 200-word macro-summary is generated on ingest and pinned to every query. Magnum never loses the overarching context.',
               icon: Icons.account_tree_outlined,
-              color: AppTheme.accentBlue,
+              color: AppTheme.accent,
             ),
             const SizedBox(height: 16),
             _BrainCard(
@@ -305,16 +310,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               description:
                   'Retrieves the 15 most relevant chunks plus their adjacent paragraphs, ensuring unbroken context continuity.',
               icon: Icons.manage_search,
-              color: AppTheme.accentBlueLight,
+              color: AppTheme.accentLight,
             ),
             const SizedBox(height: 16),
             _BrainCard(
               step: '03',
               title: 'Traceback Citations',
               description:
-                  'Every AI response ends with exact source references — [Source: Page 42] — so you can verify every claim.',
+                  'Every response ends with exact source references — [Source: Page 42] — so you can verify every claim.',
               icon: Icons.verified_outlined,
-              color: const Color(0xFF16A34A),
+              color: AppTheme.success,
             ),
           ],
         ),
@@ -337,14 +342,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Your Complexity Dial',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Slide to control how deep the AI goes. It resets nothing — it simply changes how the AI speaks.',
+              'Slide to control how deep Magnum goes. It resets nothing — it simply changes how Magnum responds.',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
             const SizedBox(height: 32),
@@ -372,7 +377,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               'Magnum Opus Pro',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
               ),
@@ -381,7 +386,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             const Text(
               '\$7.99 / month  ·  \$69.99 / year  ·  \$159.99 lifetime',
               style:
-                  TextStyle(color: AppTheme.accentBlueLight, fontSize: 13),
+                  TextStyle(color: AppTheme.accentLight, fontSize: 13),
             ),
             const SizedBox(height: 32),
             _ProFeatureRow(
@@ -392,7 +397,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             _ProFeatureRow(
               icon: Icons.mic_outlined,
               title: 'Audio Transcription',
-              subtitle: 'Upload lectures — AI transcribes & indexes.',
+              subtitle: 'Upload lectures — auto-transcribed & indexed.',
             ),
             _ProFeatureRow(
               icon: Icons.language,
@@ -420,11 +425,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.border),
               ),
               child: const Text(
-                'Free tier: PDF & TXT · 5 queries/day · 1 free audio transcription · Unlimited document size',
+                'Free tier: PDF & TXT · 5 queries/day · 3 free audio transcriptions · Unlimited document size',
                 style:
                     TextStyle(color: AppTheme.textSecondary, fontSize: 12),
               ),
@@ -435,7 +440,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     );
   }
 
-  // ─── Page 5: Persona ─────────────────────────────────────────────────────
+  // ─── Page 5: Persona + Name ───────────────────────────────────────────────
 
   Widget _buildPage5() {
     const personas = [
@@ -456,7 +461,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     return _PageWrapper(
       slideAnimation: _pageSlides[4],
       fadeAnimation: _pageFades[4],
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,7 +472,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               child: Text(
                 'How will you use\nMagnum Opus?',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
                   height: 1.2,
@@ -483,39 +488,102 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               ),
             ),
             const SizedBox(height: 24),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.2,
-                children: personas
-                    .map((p) => _PersonaCard(
-                          data: p,
-                          selected: _selectedPersona == p.label,
-                          onTap: () => setState(
-                              () => _selectedPersona = p.label),
-                        ))
-                    .toList(),
-              ),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.2,
+              children: personas
+                  .map((p) => _PersonaCard(
+                        data: p,
+                        selected: _selectedPersona == p.label,
+                        onTap: () =>
+                            setState(() => _selectedPersona = p.label),
+                      ))
+                  .toList(),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 28),
+            // Name input
+            Row(
+              children: [
+                const Text(
+                  'What should we call you?',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    _nameController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Skip',
+                    style: TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'First name or nickname',
+                hintStyle: const TextStyle(color: AppTheme.textMuted),
+                filled: true,
+                fillColor: AppTheme.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppTheme.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppTheme.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: AppTheme.accent, width: 2),
+                ),
+              ),
+              textCapitalization: TextCapitalization.words,
+              maxLength: 30,
+              buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                  null,
+            ),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _selectedPersona.isNotEmpty ? _finish : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentBlue,
+                  backgroundColor: AppTheme.accent,
                   disabledBackgroundColor: AppTheme.border,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppTheme.textPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   elevation: 0,
                 ),
                 child: const Text(
-                  'Get Started',
+                  'Get Started →',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
@@ -523,7 +591,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -560,7 +628,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 height: 6,
                 decoration: BoxDecoration(
                   color: i == _currentPage
-                      ? AppTheme.accentBlue
+                      ? AppTheme.accent
                       : AppTheme.border,
                   borderRadius: BorderRadius.circular(3),
                 ),
@@ -574,7 +642,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               child: const Text(
                 'Next',
                 style: TextStyle(
-                  color: AppTheme.accentBlueLight,
+                  color: AppTheme.accentLight,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -660,7 +728,7 @@ class _BrainCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border),
       ),
       child: Row(
@@ -671,7 +739,7 @@ class _BrainCard extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
@@ -683,7 +751,7 @@ class _BrainCard extends StatelessWidget {
                 Text(
                   '$step  $title',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -736,7 +804,7 @@ class _ComplexityPreviewCard extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
@@ -744,12 +812,12 @@ class _ComplexityPreviewCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome, color: AppTheme.accentBlue, size: 14),
+              const Icon(Icons.auto_awesome, color: AppTheme.accent, size: 14),
               const SizedBox(width: 6),
               Text(
                 'Response preview — $label mode',
                 style: const TextStyle(
-                  color: AppTheme.accentBlueLight,
+                  color: AppTheme.accentLight,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -798,10 +866,10 @@ class _ProFeatureRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppTheme.accentBlue.withOpacity(0.12),
+              color: AppTheme.accent.withOpacity(0.12),
               borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, color: AppTheme.accentBlueLight, size: 18),
+            child: Icon(icon, color: AppTheme.accentLight, size: 18),
           ),
           const SizedBox(width: 14),
           Column(
@@ -810,7 +878,7 @@ class _ProFeatureRow extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 14),
               ),
@@ -854,11 +922,11 @@ class _PersonaCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.accentBlue.withOpacity(0.12)
+              ? AppTheme.accent.withOpacity(0.12)
               : AppTheme.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(9),
           border: Border.all(
-            color: selected ? AppTheme.accentBlue : AppTheme.border,
+            color: selected ? AppTheme.accent : AppTheme.border,
             width: selected ? 2 : 1,
           ),
         ),
@@ -867,14 +935,14 @@ class _PersonaCard extends StatelessWidget {
           children: [
             Icon(
               data.icon,
-              color: selected ? AppTheme.accentBlueLight : AppTheme.textMuted,
+              color: selected ? AppTheme.accentLight : AppTheme.textMuted,
               size: 24,
             ),
             const Spacer(),
             Text(
               data.label,
               style: TextStyle(
-                color: selected ? Colors.white : AppTheme.textSecondary,
+                color: selected ? AppTheme.textPrimary : AppTheme.textSecondary,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),

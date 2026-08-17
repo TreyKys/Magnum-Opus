@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -7,22 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:magnum_opus/core/subscription/subscription_service.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
 import 'package:magnum_opus/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
+import 'package:magnum_opus/app/main_scaffold.dart';
 import 'package:magnum_opus/features/settings/presentation/settings_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/vault_screen.dart';
-
-// Dev convenience: bypass SSL certificate errors for local/test APIs.
-// IMPORTANT: Remove or gate on kReleaseMode before publishing to stores.
-class MyHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback =
-          (X509Certificate cert, String host, int port) => true;
-  }
-}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,8 +25,9 @@ Future<void> main() async {
   await MobileAds.instance.initialize();
   await dotenv.load(fileName: '.env');
 
-  // Dev SSL bypass — see MyHttpOverrides above
-  HttpOverrides.global = MyHttpOverrides();
+  // Configure RevenueCat. No-ops safely if REVENUECAT_*_API_KEY isn't set
+  // in .env yet — app runs on the free tier until it is.
+  await SubscriptionService.init();
 
   // Pre-read onboarding flag before first frame to avoid flash of onboarding
   // on returning users (provider async init would otherwise briefly show page 1)
@@ -67,7 +57,7 @@ class MyApp extends ConsumerWidget {
       title: 'Magnum Opus',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
-      home: showVault ? const VaultScreen() : const OnboardingScreen(),
+      home: showVault ? const MainScaffold() : const OnboardingScreen(),
       onGenerateRoute: _generateRoute,
     );
   }

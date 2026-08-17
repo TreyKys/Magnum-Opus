@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
 import 'package:magnum_opus/features/vault/models/document_model.dart';
 import 'package:magnum_opus/features/vault/providers/vault_provider.dart';
-import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
+import 'package:magnum_opus/features/vault/presentation/document_chat_screen.dart';
 import 'package:magnum_opus/features/vault/presentation/document_view_screen.dart';
+import 'package:magnum_opus/features/vault/presentation/pdf_viewer_screen.dart';
 
 class VaultScreen extends ConsumerWidget {
   const VaultScreen({super.key});
@@ -14,42 +17,19 @@ class VaultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vaultState = ref.watch(vaultProvider);
     final documents = vaultState.documents;
-    final recentDocuments = List.of(documents)
-      ..sort((a, b) => b.lastAccessed.compareTo(a.lastAccessed));
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Magnum Opus'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.pushNamed(context, '/settings');
-              },
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'VAULT'),
-              Tab(text: 'RECENTS'),
-            ],
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          documents.isEmpty ? 'Library' : 'Library  (${documents.length})',
         ),
-        body: TabBarView(
-          children: [
-            _buildDocumentList(
-                context, ref, documents, vaultState.indexingDocumentIds),
-            _buildDocumentList(
-                context, ref, recentDocuments, vaultState.indexingDocumentIds),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showIngestSheet(context, ref),
-          child: const Icon(Icons.add),
-        ),
+        automaticallyImplyLeading: false,
+      ),
+      body: _buildDocumentList(
+          context, ref, documents, vaultState.indexingDocumentIds),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showIngestSheet(context, ref),
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -74,7 +54,7 @@ class VaultScreen extends ConsumerWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: AppTheme.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -95,7 +75,7 @@ class VaultScreen extends ConsumerWidget {
                 ),
                 _IngestOption(
                   icon: Icons.description_outlined,
-                  iconColor: AppTheme.accentBlueLight,
+                  iconColor: AppTheme.accentLight,
                   title: 'Documents',
                   subtitle: 'PDF, EPUB, DOCX, TXT, CSV',
                   onTap: () {
@@ -117,10 +97,10 @@ class VaultScreen extends ConsumerWidget {
                   icon: Icons.headphones_outlined,
                   iconColor: AppTheme.badgeAudio,
                   title: 'Audio',
-                  subtitle: 'MP3, M4A, WAV — transcribed by AI',
+                  subtitle: 'MP3, M4A, WAV — auto-transcribed',
                   onTap: () {
                     Navigator.pop(ctx);
-                    ref.read(vaultProvider.notifier).ingestAudio();
+                    ingestAudioOrShowPaywall(context, ref);
                   },
                 ),
                 _IngestOption(
@@ -149,37 +129,36 @@ class VaultScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: const Text('Scrape Web URL',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.url,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppTheme.textPrimary),
           decoration: InputDecoration(
             hintText: 'https://example.com/article',
-            hintStyle: const TextStyle(color: Colors.white38),
+            hintStyle: const TextStyle(color: AppTheme.textMuted),
             filled: true,
             fillColor: AppTheme.background,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(6),
               borderSide: const BorderSide(color: AppTheme.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppTheme.accentBlue),
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: AppTheme.accent),
             ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: AppTheme.accent,
+              foregroundColor: AppTheme.onAccent,
               elevation: 0,
             ),
             onPressed: () {
@@ -203,33 +182,11 @@ class VaultScreen extends ConsumerWidget {
     Set<String> indexingIds,
   ) {
     if (documents.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.inbox_outlined, color: AppTheme.textMuted, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              'Vault is empty',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Tap + to add PDF, EPUB, DOCX,\nXLSX, PPTX, audio, or a web URL',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 14, height: 1.5),
-            ),
-          ],
-        ),
-      );
+      return const _EmptyState();
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: documents.length,
       itemBuilder: (context, index) {
         final doc = documents[index];
@@ -238,92 +195,131 @@ class VaultScreen extends ConsumerWidget {
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                _openDocument(context, doc);
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
-                  leading: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: Icon(_iconForType(doc.fileType),
-                        color: typeColor, size: 22),
-                  ),
-                  title: Text(
-                    doc.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Row(
-                      children: [
-                        // File type badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: typeColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            doc.fileType.toUpperCase(),
-                            style: TextStyle(
-                              color: typeColor,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Colored accent strip
+                    Container(width: 4, color: typeColor),
+                    // Card content
+                    Expanded(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            _openDocument(context, doc);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // Format icon
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: typeColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    _iconForType(doc.fileType),
+                                    color: typeColor,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Title + meta
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        doc.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 5),
+                                      Row(
+                                        children: [
+                                          _TypeBadge(
+                                            label: doc.fileType.toUpperCase(),
+                                            color: typeColor,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${doc.fileSizeMb.toStringAsFixed(1)} MB',
+                                            style: const TextStyle(
+                                                color: AppTheme.textMuted,
+                                                fontSize: 12),
+                                          ),
+                                          if (doc.totalPages > 0) ...[
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              '· ${doc.totalPages} ${_pageLabel(doc.fileType)}',
+                                              style: const TextStyle(
+                                                  color: AppTheme.textMuted,
+                                                  fontSize: 12),
+                                            ),
+                                          ],
+                                          if (isIndexing) ...[
+                                            const SizedBox(width: 10),
+                                            const _PulsingIndicator(),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _formatRelativeDate(doc.lastAccessed),
+                                        style: const TextStyle(
+                                          color: AppTheme.textMuted,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Chat
+                                IconButton(
+                                  icon: const Icon(Icons.chat_bubble_outline,
+                                      color: AppTheme.textMuted, size: 18),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    _slideRoute(DocumentChatScreen(document: doc)),
+                                  ),
+                                ),
+                                // Delete
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline,
+                                      color: AppTheme.danger),
+                                  onPressed: () => ref
+                                      .read(vaultProvider.notifier)
+                                      .deleteDocument(doc.id, doc.filePath),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${doc.fileSizeMb.toStringAsFixed(1)} MB',
-                          style: const TextStyle(
-                              color: AppTheme.textMuted, fontSize: 12),
-                        ),
-                        if (doc.totalPages > 0) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            '· ${doc.totalPages} ${_pageLabel(doc.fileType)}',
-                            style: const TextStyle(
-                                color: AppTheme.textMuted, fontSize: 12),
-                          ),
-                        ],
-                        if (isIndexing) ...[
-                          const SizedBox(width: 10),
-                          const _PulsingIndicator(),
-                        ],
-                      ],
+                      ),
                     ),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Color(0xFFFF5252)),
-                    onPressed: () => ref
-                        .read(vaultProvider.notifier)
-                        .deleteDocument(doc.id, doc.filePath),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -337,13 +333,7 @@ class VaultScreen extends ConsumerWidget {
     if (doc.fileType == 'pdf') {
       Navigator.push(
         context,
-        _slideRoute(
-          PdfViewerScreen(
-            id: doc.id,
-            filePath: doc.filePath,
-            title: doc.title,
-          ),
-        ),
+        _slideRoute(PdfViewerScreen(document: doc)),
       );
     } else {
       Navigator.push(
@@ -369,68 +359,253 @@ class VaultScreen extends ConsumerWidget {
     );
   }
 
+  static String _formatRelativeDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final d = DateTime(date.year, date.month, date.day);
+    final diff = today.difference(d).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    if (diff < 7) return '$diff days ago';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${date.day} ${months[date.month - 1]}';
+  }
+
   static Color _colorForType(String type) {
     switch (type) {
-      case 'epub':
-        return AppTheme.badgeEpub;
-      case 'docx':
-        return AppTheme.badgeDocx;
-      case 'xlsx':
-        return AppTheme.badgeXlsx;
-      case 'pptx':
-        return AppTheme.badgePptx;
-      case 'csv':
-        return AppTheme.badgeCsv;
-      case 'txt':
-        return AppTheme.badgeTxt;
-      case 'audio':
-        return AppTheme.badgeAudio;
-      case 'url':
-        return AppTheme.badgeUrl;
-      default:
-        return AppTheme.badgePdf;
+      case 'epub':  return AppTheme.badgeEpub;
+      case 'docx':  return AppTheme.badgeDocx;
+      case 'xlsx':  return AppTheme.badgeXlsx;
+      case 'pptx':  return AppTheme.badgePptx;
+      case 'csv':   return AppTheme.badgeCsv;
+      case 'txt':   return AppTheme.badgeTxt;
+      case 'audio': return AppTheme.badgeAudio;
+      case 'url':   return AppTheme.badgeUrl;
+      default:      return AppTheme.badgePdf;
     }
   }
 
   static IconData _iconForType(String type) {
     switch (type) {
-      case 'epub':
-        return Icons.menu_book_outlined;
-      case 'docx':
-        return Icons.description_outlined;
-      case 'xlsx':
-        return Icons.table_chart_outlined;
-      case 'pptx':
-        return Icons.slideshow_outlined;
-      case 'csv':
-        return Icons.grid_on_outlined;
-      case 'txt':
-        return Icons.text_snippet_outlined;
-      case 'audio':
-        return Icons.headphones_outlined;
-      case 'url':
-        return Icons.language_outlined;
-      default:
-        return Icons.picture_as_pdf_outlined;
+      case 'epub':  return Icons.menu_book_outlined;
+      case 'docx':  return Icons.description_outlined;
+      case 'xlsx':  return Icons.table_chart_outlined;
+      case 'pptx':  return Icons.slideshow_outlined;
+      case 'csv':   return Icons.grid_on_outlined;
+      case 'txt':   return Icons.text_snippet_outlined;
+      case 'audio': return Icons.headphones_outlined;
+      case 'url':   return Icons.language_outlined;
+      default:      return Icons.picture_as_pdf_outlined;
     }
   }
 
   static String _pageLabel(String type) {
-    switch (type) {
-      case 'audio':
-      case 'url':
-      case 'epub':
-      case 'docx':
-      case 'xlsx':
-      case 'pptx':
-      case 'csv':
-      case 'txt':
-        return 'chunks';
-      default:
-        return 'pages';
-    }
+    if (type == 'pdf') return 'pages';
+    return 'chunks';
   }
 }
+
+// ─── Shared audio-ingest gate ──────────────────────────────────────────────
+//
+// Free tier caps audio transcriptions at [VaultNotifier.maxFreeAudioIngests]
+// lifetime uses (bypassed for Pro). Both vault_screen.dart and
+// home_screen.dart's quick-ingest grid route through this single entry
+// point so the limit is enforced identically everywhere audio can be
+// ingested — never call VaultNotifier.ingestAudio() directly from UI code.
+void ingestAudioOrShowPaywall(BuildContext context, WidgetRef ref) {
+  final isPro = ref.read(subscriptionProvider).isPro;
+  final used = ref.read(vaultProvider).audioIngestsUsed;
+  final atLimit = !isPro && used >= VaultNotifier.maxFreeAudioIngests;
+
+  if (atLimit) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Free audio transcriptions used up',
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
+        content: Text(
+          'You\'ve used all ${VaultNotifier.maxFreeAudioIngests} free audio transcriptions. '
+          'Upgrade to Pro for unlimited audio ingests.',
+          style: const TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const UpgradeScreen()));
+            },
+            child: const Text('Upgrade to Pro',
+                style: TextStyle(color: AppTheme.accentLight, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    return;
+  }
+
+  ref.read(vaultProvider.notifier).ingestAudio();
+}
+
+// ─── Type badge pill ──────────────────────────────────────────────────────────
+
+class _TypeBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _TypeBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Empty state with animated badge grid ─────────────────────────────────────
+
+class _EmptyState extends StatefulWidget {
+  const _EmptyState();
+
+  @override
+  State<_EmptyState> createState() => _EmptyStateState();
+}
+
+class _EmptyStateState extends State<_EmptyState>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<Offset> _slide;
+  late Animation<double> _fade;
+
+  static const _badges = [
+    ('PDF',  AppTheme.badgePdf),
+    ('EPUB', AppTheme.badgeEpub),
+    ('DOCX', AppTheme.badgeDocx),
+    ('XLSX', AppTheme.badgeXlsx),
+    ('PPTX', AppTheme.badgePptx),
+    ('CSV',  AppTheme.badgeCsv),
+    ('MP3',  AppTheme.badgeAudio),
+    ('URL',  AppTheme.badgeUrl),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.35),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SlideTransition(
+              position: _slide,
+              child: FadeTransition(
+                opacity: _fade,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final badge in _badges)
+                      _EmptyBadgePill(label: badge.$1, color: badge.$2),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'Your vault is empty',
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Tap + to add your first document',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: AppTheme.textMuted, fontSize: 14, height: 1.6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyBadgePill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _EmptyBadgePill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Ingest option row ────────────────────────────────────────────────────────
 
 class _IngestOption extends StatelessWidget {
   final IconData icon;
@@ -456,13 +631,13 @@ class _IngestOption extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           color: iconColor.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Icon(icon, color: iconColor, size: 20),
       ),
       title: Text(title,
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              color: AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
       subtitle: Text(subtitle,
           style: const TextStyle(color: AppTheme.textMuted, fontSize: 12)),
       onTap: onTap,
@@ -470,8 +645,11 @@ class _IngestOption extends StatelessWidget {
   }
 }
 
+// ─── Pulsing indexing indicator ───────────────────────────────────────────────
+
 class _PulsingIndicator extends StatefulWidget {
   const _PulsingIndicator();
+
   @override
   State<_PulsingIndicator> createState() => _PulsingIndicatorState();
 }
@@ -510,7 +688,7 @@ class _PulsingIndicatorState extends State<_PulsingIndicator>
             width: 7,
             height: 7,
             decoration: const BoxDecoration(
-              color: AppTheme.accentBlueLight,
+              color: AppTheme.accentLight,
               shape: BoxShape.circle,
             ),
           ),
@@ -519,7 +697,7 @@ class _PulsingIndicatorState extends State<_PulsingIndicator>
         const Text(
           'Indexing...',
           style: TextStyle(
-            color: AppTheme.accentBlueLight,
+            color: AppTheme.accentLight,
             fontSize: 10,
             fontWeight: FontWeight.w600,
           ),

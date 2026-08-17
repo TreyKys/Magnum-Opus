@@ -1,0 +1,659 @@
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:markdown_widget/markdown_widget.dart';
+import 'package:magnum_opus/core/ads/ad_config.dart';
+import 'package:magnum_opus/core/ads/rewarded_interstitial_controller.dart';
+import 'package:magnum_opus/core/theme/app_theme.dart';
+import 'package:magnum_opus/core/theme/markdown_theme.dart';
+import 'package:magnum_opus/features/onboarding/providers/onboarding_provider.dart';
+import 'package:magnum_opus/features/settings/providers/complexity_provider.dart';
+import 'package:magnum_opus/features/settings/providers/energy_provider.dart';
+import 'package:magnum_opus/features/settings/providers/subscription_provider.dart';
+import 'package:magnum_opus/features/settings/widgets/complexity_dial.dart';
+import 'package:magnum_opus/features/vault/models/chat_message.dart';
+import 'package:magnum_opus/features/vault/models/document_model.dart';
+import 'package:magnum_opus/features/vault/providers/chat_provider.dart';
+import 'package:magnum_opus/features/vault/services/export_service.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:magnum_opus/features/settings/presentation/upgrade_screen.dart';
+
+class DocumentChatScreen extends ConsumerStatefulWidget {
+  final DocumentModel document;
+  const DocumentChatScreen({super.key, required this.document});
+
+  @override
+  ConsumerState<DocumentChatScreen> createState() =>
+      _DocumentChatScreenState();
+}
+
+class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
+  final TextEditingController _inputController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  RewardedAd? _rewardedAd;
+  bool _loadingAd = false;
+
+  /// True once the user has actually sent something this visit. The exit ad is
+  /// only offered after a real exchange — opening a chat and immediately
+  /// backing out should never be met with an ad.
+  bool _hadConversation = false;
+
+  /// Guards the exit path so a double-tap on back cannot run it twice.
+  bool _exiting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAd();
+    RewardedInterstitialController.instance.preload();
+  }
+
+  @override
+  void dispose() {
+    _inputController.dispose();
+    _scrollController.dispose();
+    _rewardedAd?.dispose();
+    super.dispose();
+  }
+
+  void _loadAd() {
+    setState(() => _loadingAd = true);
+    RewardedAd.load(
+      adUnitId: AdConfig.rewardedUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          setState(() {
+            _rewardedAd = ad;
+            _loadingAd = false;
+          });
+        },
+        onAdFailedToLoad: (_) => setState(() => _loadingAd = false),
+      ),
+    );
+  }
+
+  void _showAd() {
+    if (_rewardedAd == null) return;
+    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _rewardedAd = null;
+        _loadAd();
+      },
+    );
+    _rewardedAd!.show(
+      onUserEarnedReward: (_, __) {
+        ref.read(energyProvider.notifier).refillEnergy();
+      },
+    );
+  }
+
+  void _send() {
+    final text = _inputController.text.trim();
+    if (text.isEmpty) return;
+    final isPro = ref.read(subscriptionProvider).isPro;
+    if (!isPro) {
+      final energy = ref.read(energyProvider);
+      if (energy <= 0) return;
+      ref.read(energyProvider.notifier).consumeEnergy();
+    }
+    ref.read(chatProvider(widget.document.id).notifier).sendMessage(text);
+    _hadConversation = true;
+    _inputController.clear();
+    Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
+  }
+
+  /// Single exit path for both the app-bar arrow and the system back gesture.
+  /// Offers the bonus-query ad, then always pops — a failure anywhere in the
+  /// ad path must never leave the user stuck on this screen.
+  Future<void> _handleExit() async {
+    if (_exiting) return;
+    _exiting = true;
+    try {
+      await RewardedInterstitialController.instance.maybeShowOnExit(
+        context: context,
+        // Captured now: this State is about to be torn down, so the reward
+        // callback must not reach through a possibly-disposed ref.
+        energy: ref.read(energyProvider.notifier),
+        isPro: ref.read(subscriptionProvider).isPro,
+        hadConversation: _hadConversation,
+      );
+    } catch (_) {
+      // Swallowed deliberately — see finally.
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = ref.watch(chatProvider(widget.document.id));
+    final energy = ref.watch(energyProvider);
+    final isPro = ref.watch(subscriptionProvider).isPro;
+    final displayName = ref.watch(onboardingProvider).displayName;
+    final initials = _initials(displayName);
+
+    ref.listen(chatProvider(widget.document.id), (_, __) {
+      Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+    });
+
+    return PopScope(
+      // canPop is false so the system back gesture routes through _handleExit
+      // too, rather than only the app-bar arrow. _handleExit always pops.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleExit();
+      },
+      child: Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+          onPressed: _handleExit,
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.document.title,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              '${widget.document.totalPages} sections · RAG active',
+              style: const TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined,
+                color: AppTheme.textSecondary, size: 20),
+            tooltip: 'Export PDF',
+            onPressed: messages.isEmpty
+                ? null
+                : () => ExportService.exportChatAsPdf(
+                      context,
+                      widget.document.title,
+                      messages,
+                    ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Complexity strip
+          Container(
+            color: AppTheme.surfaceVariant,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: const ComplexityMiniDial(),
+          ),
+          // Messages
+          Expanded(
+            child: messages.isEmpty
+                ? _EmptyState(docTitle: widget.document.title)
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 14),
+                    itemCount: messages.length + (messages.isNotEmpty && messages.last.isUser ? 1 : 0),
+                    itemBuilder: (_, i) {
+                      if (i == messages.length) return const _TypingIndicator();
+                      return _MessageBubble(
+                        message: messages[i],
+                        initials: initials,
+                      );
+                    },
+                  ),
+          ),
+          // Input bar or no-energy banner (Pro users never see the banner)
+          (!isPro && energy <= 0)
+              ? _NoEnergyBanner(
+                  loadingAd: _loadingAd,
+                  onWatchAd: _rewardedAd != null ? _showAd : null,
+                )
+              : _InputBar(
+                  controller: _inputController,
+                  energy: isPro ? -1 : energy,
+                  onSend: _send,
+                ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    if (name.isEmpty) return 'MO';
+    final parts = name.trim().split(' ');
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+}
+
+// ─── Message bubble ────────────────────────────────────────────────────────────
+
+class _MessageBubble extends ConsumerWidget {
+  final ChatMessage message;
+  final String initials;
+  const _MessageBubble({required this.message, required this.initials});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final complexity = ref.watch(complexityProvider);
+    final depthLabel = complexityLabel(complexity);
+
+    void copyToClipboard() {
+      Clipboard.setData(ClipboardData(text: message.text));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Copied to clipboard'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    if (message.isUser) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Flexible(
+              child: GestureDetector(
+                onLongPress: copyToClipboard,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceRaised,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    message.text,
+                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: AppTheme.accent,
+              child: Text(
+                initials,
+                style: const TextStyle(
+                    color: AppTheme.onAccent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // AI bubble — parse out [Source: ...] citations
+    final parsed = _parseSources(message.text);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GestureDetector(
+        onLongPress: copyToClipboard,
+        child: Container(
+          decoration: AppTheme.spinePanel(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+              child: Text('MAGNUM OPUS · $depthLabel DEPTH',
+                  style: AppTheme.eyebrow(color: AppTheme.accent)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+              child: MarkdownWidget(
+                data: parsed.body,
+                shrinkWrap: true,
+                config: MarkdownTheme.response,
+              ),
+            ),
+            for (final src in parsed.sources) _SourceChip(text: src),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    ),
+    );
+  }
+
+  _ParsedMessage _parseSources(String text) {
+    final sourcePattern = RegExp(
+        r'\[Source:[^\]]+\]', caseSensitive: false);
+    final sources = sourcePattern
+        .allMatches(text)
+        .map((m) => m.group(0)!
+            .replaceAll(RegExp(r'^\[Source:\s*'), '')
+            .replaceAll(']', '')
+            .trim())
+        .toList();
+    final body = text.replaceAll(sourcePattern, '').trim();
+    return _ParsedMessage(body: body, sources: sources);
+  }
+}
+
+class _ParsedMessage {
+  final String body;
+  final List<String> sources;
+  const _ParsedMessage({required this.body, required this.sources});
+}
+
+class _SourceChip extends StatelessWidget {
+  final String text;
+  const _SourceChip({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.accent.withOpacity(0.06),
+        border: const Border(
+          left: BorderSide(color: AppTheme.accent, width: 3),
+        ),
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(8),
+          bottomRight: Radius.circular(8),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Text(
+            'SRC',
+            style: TextStyle(
+              color: AppTheme.accent,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                  color: AppTheme.textMuted, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Input bar ────────────────────────────────────────────────────────────────
+
+class _InputBar extends StatelessWidget {
+  final TextEditingController controller;
+  final int energy;
+  final VoidCallback onSend;
+
+  const _InputBar({
+    required this.controller,
+    required this.energy,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppTheme.surface,
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+              maxLines: 4,
+              minLines: 1,
+              decoration: InputDecoration(
+                hintText: 'Ask about this document…',
+                hintStyle: const TextStyle(color: AppTheme.textMuted),
+                filled: true,
+                fillColor: AppTheme.surfaceVariant,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                suffixText: energy < 0 ? '∞ Pro' : '$energy left',
+                suffixStyle: const TextStyle(
+                    color: AppTheme.textMuted, fontSize: 11),
+              ),
+              onSubmitted: (_) => onSend(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onSend,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppTheme.accent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.send, color: AppTheme.onAccent, size: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── No energy banner ─────────────────────────────────────────────────────────
+
+class _NoEnergyBanner extends StatelessWidget {
+  final bool loadingAd;
+  final VoidCallback? onWatchAd;
+
+  const _NoEnergyBanner({required this.loadingAd, required this.onWatchAd});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppTheme.surface,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Row(
+        children: [
+          const Icon(Icons.bolt, color: AppTheme.textMuted, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'No queries left today',
+              style:
+                  TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+          ),
+          if (loadingAd)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppTheme.accent),
+            )
+          else
+            TextButton(
+              onPressed: onWatchAd,
+              child: const Text(
+                'Watch Ad +2',
+                style: TextStyle(
+                    color: AppTheme.accentLight,
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UpgradeScreen()),
+            ),
+            child: const Text('Upgrade',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Typing indicator ─────────────────────────────────────────────────────────
+
+class _TypingIndicator extends StatefulWidget {
+  const _TypingIndicator();
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with TickerProviderStateMixin {
+  late final List<AnimationController> _controllers;
+  late final List<Animation<double>> _anims;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = List.generate(
+      3,
+      (i) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 500),
+      )..repeat(reverse: true, period: const Duration(milliseconds: 900)),
+    );
+    _anims = List.generate(3, (i) {
+      Future.delayed(Duration(milliseconds: i * 150), () {
+        if (mounted) _controllers[i].forward();
+      });
+      return Tween<double>(begin: 0.3, end: 1.0).animate(_controllers[i]);
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers) c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Thinking',
+                  style: TextStyle(
+                      color: AppTheme.accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 8),
+                ...List.generate(3, (i) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: FadeTransition(
+                        opacity: _anims[i],
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    )),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final String docTitle;
+  const _EmptyState({required this.docTitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.chat_bubble_outline,
+                color: AppTheme.textMuted, size: 40),
+            const SizedBox(height: 16),
+            const Text(
+              'Ask anything about this document',
+              style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              docTitle,
+              style: const TextStyle(
+                  color: AppTheme.textMuted, fontSize: 13),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
