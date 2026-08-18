@@ -55,10 +55,19 @@ android {
 
     buildTypes {
         release {
-            // Shrinking stays off — turning R8 on days before a launch risks
-            // stripping something reflective in the ad/billing SDKs. The rules
-            // file (ML Kit script warnings) is wired up now so enabling
-            // isMinifyEnabled later is a one-line change.
+            // Set explicitly rather than inherited: Flutter's Gradle plugin
+            // enables R8 for release by default, so leaving this unset meant
+            // shrinking was silently ON. Being explicit makes the behaviour
+            // obvious and lets it be flipped without guessing.
+            //
+            // Currently OFF. R8 needs d8/r8 from the Android SDK build-tools,
+            // and it is the first thing to fail on a damaged SDK install. It
+            // also risks stripping reflective code in the ad/billing SDKs.
+            // Turn it back on once the toolchain is known-good; the rules
+            // below (ML Kit script warnings) are already in place for that.
+            isMinifyEnabled = false
+            isShrinkResources = false
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
