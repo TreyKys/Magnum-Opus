@@ -96,7 +96,31 @@ else
   echo "  in a way this check does not cover. Reinstalling anyway is safe."
 fi
 
-# ── 4. Reinstall ───────────────────────────────────────────────────────────
+# ── 4. Ownership / write check ──────────────────────────────────────────────
+# "Failed to read or create install properties file" is sdkmanager's stock
+# message for one specific cause: it can't write into the SDK tree, almost
+# always because the SDK is owned by a different user than the one running
+# this script (root vs. the workspace user is the common cloud-IDE case).
+# Detecting this up front turns a cryptic mid-install failure into a clear
+# one-line diagnosis.
+say "Write access"
+ME="$(id -un)"
+OWNER="$(stat -c '%U' "$SDK" 2>/dev/null || stat -f '%Su' "$SDK" 2>/dev/null || echo unknown)"
+if [ -w "$SDK" ] && { [ ! -d "$BT" ] || [ -w "$BT" ]; }; then
+  ok "$SDK is writable by $ME"
+else
+  warn "$SDK is NOT writable by $ME (owned by: $OWNER)"
+  warn "This is what produces 'Failed to read or create install properties file'."
+  echo
+  echo "  Fix ownership, then re-run this script:"
+  echo "    sudo chown -R \"$ME\" \"$SDK\""
+  echo
+  echo "  If sudo isn't available, run the install itself as the owner instead:"
+  echo "    sudo -u $OWNER bash tools/fix_android_sdk.sh"
+  exit 1
+fi
+
+# ── 5. Reinstall ───────────────────────────────────────────────────────────
 say "Reinstalling build-tools"
 SDKMAN="$(find "$SDK" -name sdkmanager -type f 2>/dev/null | head -1)"
 if [ -z "$SDKMAN" ]; then
@@ -109,11 +133,24 @@ ok "using $SDKMAN"
 chmod +x "$SDKMAN" 2>/dev/null
 
 TARGET="${1:-35.0.0}"
-yes 2>/dev/null | "$SDKMAN" "build-tools;$TARGET" || {
-  warn "sdkmanager failed for build-tools;$TARGET"
+LOG="$(mktemp)"
+# Capture the full log (--verbose) so a failure shows its real cause rather
+# than sdkmanager's terse default output. PIPESTATUS[1] is checked, not the
+# pipeline's own status, because the last stage is `tee` — with a three-stage
+# pipe the final exit code belongs to tee, not to sdkmanager.
+yes 2>/dev/null | "$SDKMAN" --verbose "build-tools;$TARGET" 2>&1 | tee "$LOG"
+SDKMAN_STATUS="${PIPESTATUS[1]}"
+
+if [ "$SDKMAN_STATUS" -ne 0 ]; then
+  warn "sdkmanager exited $SDKMAN_STATUS installing build-tools;$TARGET"
+  warn "Full log: $LOG"
+  echo
+  tail -15 "$LOG" | sed 's/^/    /'
+  echo
   warn "Try another revision, e.g.: bash tools/fix_android_sdk.sh 34.0.0"
   exit 1
-}
+fi
+rm -f "$LOG"
 
 say "Result"
 ls -1 "$BT" 2>/dev/null | sed 's/^/  /'
