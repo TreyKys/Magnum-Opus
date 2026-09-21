@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Magnum Opus — Awareness Ad v2</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:1080px;height:1920px;overflow:hidden;background:#000;font-family:'Helvetica Neue',Arial,'Liberation Sans',sans-serif;}
+  .stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:#0B0B10;}
+
+  .scene{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    opacity:0;
+    padding:0 90px;
+  }
+  .scene.active{opacity:1;}
+
+  /* ─── Gradient background variant ─────────────────────────────────────── */
+  .bg-gradient{
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,255,255,0.16), transparent 55%),
+      radial-gradient(circle at 75% 80%, rgba(255,255,255,0.10), transparent 50%),
+      linear-gradient(150deg, #5B6CFF 0%, #7B5CF0 45%, #9A4FE0 100%);
+  }
+  .bg-gradient-dark{
+    background:
+      radial-gradient(circle at 25% 15%, rgba(120,140,255,0.35), transparent 55%),
+      radial-gradient(circle at 80% 85%, rgba(150,90,255,0.30), transparent 55%),
+      #0B0B10;
+  }
+  .bg-white{ background:#FAFAFC; }
+
+  /* ─── Shared text elements ─────────────────────────────────────────────── */
+  .headline-white{
+    font-weight:900; font-size:76px; line-height:1.12; text-align:center;
+    color:#fff; letter-spacing:-1.5px;
+    transform:translateY(30px); opacity:0;
+    transition:all 0.8s cubic-bezier(0.19,1,0.22,1);
+  }
+  .scene.active .headline-white{ transform:none; opacity:1; }
+
+  .headline-gradient{
+    font-weight:900; font-size:72px; line-height:1.14; text-align:center;
+    letter-spacing:-1.5px;
+    background:linear-gradient(120deg,#5B6CFF 0%,#8A5CF0 60%,#B14FE0 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    transform:translateY(30px); opacity:0;
+    transition:all 0.8s cubic-bezier(0.19,1,0.22,1);
+  }
+  .scene.active .headline-gradient{ transform:none; opacity:1; }
+
+  .icon-badge{
+    width:120px; height:120px; border-radius:32px;
+    background:linear-gradient(135deg,#6D7CFF,#9A5CF0);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 20px 50px rgba(110,90,255,0.35);
+    margin-bottom:48px;
+    transform:translateY(20px) scale(0.85); opacity:0;
+    transition:all 0.7s cubic-bezier(0.19,1,0.22,1);
+  }
+  .scene.active .icon-badge{ transform:none; opacity:1; }
+  .icon-badge svg{ width:60px;height:60px; }
+
+  .sub-white{
+    margin-top:28px; font-weight:500; font-size:34px; text-align:center;
+    color:rgba(255,255,255,0.72); line-height:1.5;
+    transform:translateY(20px); opacity:0;
+    transition:all 0.7s 0.15s cubic-bezier(0.19,1,0.22,1);
+  }
+  .scene.active .sub-white{ transform:none; opacity:1; }
+
+  .sub-dark{
+    margin-top:24px; font-weight:600; font-size:32px; text-align:center;
+    color:#6B6B7A; line-height:1.5;
+    transform:translateY(20px); opacity:0;
+    transition:all 0.7s 0.15s cubic-bezier(0.19,1,0.22,1);
+  }
+  .scene.active .sub-dark{ transform:none; opacity:1; }
+
+  /* ─── SCENE 1 — icon + gradient headline (white bg) ───────────────────── */
+  #s1 .headline-gradient{ font-size:66px; }
+
+  /* ─── SCENE 2 — full gradient statement ───────────────────────────────── */
+  #s2 .headline-white{ font-size:80px; }
+
+  /* ─── SCENE 3 — fanned card deck hero ──────────────────────────────────── */
+  #s3{ background:#FAFAFC; }
+  .deck{
+    position:relative; width:100%; height:820px;
+    display:flex; align-items:center; justify-content:center;
+    perspective:1800px;
+  }
+  .card{
+    position:absolute; top:50%; left:50%; width:460px; height:620px;
+    margin-top:-310px; margin-left:-230px;
+    border-radius:36px;
+    box-shadow:0 40px 80px rgba(20,10,60,0.18);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    padding:40px; text-align:center;
+    opacity:0; transform:translateY(60px) rotateY(var(--ry,0)) rotate(var(--rz,0deg)) translateX(var(--tx,0));
+    transition:all 0.85s cubic-bezier(0.19,1,0.22,1);
+  }
+  .scene.active .card{ opacity:1; transform:rotateY(var(--ry,0)) rotate(var(--rz,0deg)) translateX(var(--tx,0)); }
+
+  .card-1{ --tx:-320px; --rz:-11deg; z-index:1; background:linear-gradient(160deg,#1C1C24,#101015); }
+  .card-2{ --tx:-140px; --rz:-5deg; z-index:2; background:linear-gradient(160deg,#5B6CFF,#8A5CF0); transition-delay:0.08s; }
+  .card-3{ --tx:0px; --rz:0deg; z-index:3; background:#fff; border:1px solid rgba(0,0,0,0.06); transition-delay:0.16s; }
+  .card-4{ --tx:140px; --rz:5deg; z-index:2; background:linear-gradient(160deg,#111116,#1c1c26); transition-delay:0.24s; }
+  .card-5{ --tx:320px; --rz:11deg; z-index:1; background:linear-gradient(160deg,#B14FE0,#7B5CF0); transition-delay:0.32s; }
+
+  .card-stat-num{ font-weight:900; font-size:96px; color:#fff; letter-spacing:-2px; }
+  .card-stat-lbl{ margin-top:14px; font-weight:700; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.75); }
+
+  .card-3 .doc-row{ display:flex;align-items:center;gap:14px; width:100%; padding:14px 18px; border-radius:16px; background:#F2F2F7; margin-bottom:12px; }
+  .card-3 .doc-badge{ font-size:15px; font-weight:800; padding:5px 9px; border-radius:8px; color:#fff; }
+  .card-3 .doc-name{ font-size:20px; font-weight:700; color:#1a1a22; text-align:left; }
+  .card-3 .doc-title{ font-weight:800; font-size:30px; color:#1a1a22; margin-bottom:22px; }
+
+  .card-4 .chat-lbl{ font-size:18px; font-weight:800; letter-spacing:1.5px; color:#7C8CFF; margin-bottom:14px; text-transform:uppercase; }
+  .card-4 .chat-line{ font-size:24px; font-weight:600; color:rgba(255,255,255,0.85); line-height:1.55; }
+  .card-4 .chat-cite{ margin-top:18px; font-size:17px; font-weight:700; color:#8FE0B0; }
+
+  .card-2 .badge-lbl{ font-size:20px; font-weight:800; letter-spacing:1.5px; color:rgba(255,255,255,0.85); text-transform:uppercase; margin-bottom:16px; }
+  .card-2 .badge-line{ font-size:34px; font-weight:900; color:#fff; line-height:1.25; }
+
+  .card-5 .badge-lbl{ font-size:20px; font-weight:800; letter-spacing:1.5px; color:rgba(255,255,255,0.85); text-transform:uppercase; margin-bottom:16px; }
+  .card-5 .badge-line{ font-size:34px; font-weight:900; color:#fff; line-height:1.25; }
+
+  #s3 .deck-caption{
+    margin-top:56px; font-weight:800; font-size:38px; text-align:center; color:#1a1a22;
+    opacity:0; transform:translateY(16px);
+    transition:all 0.6s 0.55s cubic-bezier(0.19,1,0.22,1);
+  }
+  #s3.scene.active .deck-caption{ opacity:1; transform:none; }
+
+  /* ─── SCENE 4 — gradient text on white ─────────────────────────────────── */
+  #s4{ background:#FAFAFC; }
+  #s4 .pill-row{ display:flex; gap:16px; margin-bottom:44px; flex-wrap:wrap; justify-content:center; }
+  .pill{
+    padding:14px 26px; border-radius:100px; font-weight:800; font-size:24px;
+    background:#F2F2F7; color:#3a3a44;
+    opacity:0; transform:translateY(14px);
+    transition:all 0.5s cubic-bezier(0.19,1,0.22,1);
+  }
+  .scene.active .pill{ opacity:1; transform:none; }
+  .pill:nth-child(1){ transition-delay:0.05s; }
+  .pill:nth-child(2){ transition-delay:0.12s; }
+  .pill:nth-child(3){ transition-delay:0.19s; }
+  .pill:nth-child(4){ transition-delay:0.26s; }
+  .pill:nth-child(5){ transition-delay:0.33s; }
+
+  /* ─── SCENE 5 — closing CTA ─────────────────────────────────────────────── */
+  #s5 .wordmark{
+    font-weight:900; font-size:64px; color:#fff; letter-spacing:-1px; margin-top:8px;
+    transform:translateY(20px); opacity:0;
+    transition:all 0.7s 0.1s cubic-bezier(0.19,1,0.22,1);
+  }
+  #s5.scene.active .wordmark{ transform:none; opacity:1; }
+
+  #s5 .cta-badge{
+    margin-top:56px;
+    padding:22px 44px; border-radius:100px;
+    background:#fff; color:#111;
+    font-weight:800; font-size:30px;
+    display:flex; align-items:center; gap:14px;
+    opacity:0; transform:translateY(16px) scale(0.96);
+    transition:all 0.7s 0.4s cubic-bezier(0.19,1,0.22,1);
+    box-shadow:0 20px 50px rgba(0,0,0,0.35);
+  }
+  #s5.scene.active .cta-badge{ opacity:1; transform:none; }
+
+  /* ─── progress ticks ─────────────────────────────────────────────────────── */
+  .ticks{ position:absolute; top:64px; left:64px; right:64px; display:flex; gap:10px; z-index:50; }
+  .tick{ flex:1; height:6px; border-radius:4px; background:rgba(120,120,140,0.25); overflow:hidden; }
+  .tick-fill{ height:100%; width:0%; background:#fff; border-radius:4px; }
+  #s1 ~ .ticks .tick, #s3 ~ .ticks .tick, #s4 ~ .ticks .tick{ background:rgba(20,20,30,0.12); }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="ticks" id="ticks"></div>
+
+  <!-- SCENE 1 -->
+  <div class="scene active bg-white" id="s1">
+    <div class="icon-badge">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M15 4v5h5" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M7.5 13h9M7.5 16.5h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </div>
+    <div class="headline-gradient">AI that actually<br>reads your documents.</div>
+    <div class="sub-dark">Not summarizes. Not guesses. Reads.</div>
+  </div>
+
+  <!-- SCENE 2 -->
+  <div class="scene bg-gradient" id="s2">
+    <div class="headline-white">Turn any PDF into<br>an instant, cited answer.</div>
+  </div>
+
+  <!-- SCENE 3 — fanned deck -->
+  <div class="scene" id="s3">
+    <div class="deck">
+      <div class="card card-1">
+        <div class="card-stat-num">0%</div>
+        <div class="card-stat-lbl">Hallucinations</div>
+      </div>
+      <div class="card card-2">
+        <div class="badge-lbl">Ask</div>
+        <div class="badge-line">"Summarise the key risks in Section 4.2"</div>
+      </div>
+      <div class="card card-3">
+        <div class="doc-title">Your Library</div>
+        <div class="doc-row"><span class="doc-badge" style="background:#EF4444">PDF</span><span class="doc-name">Annual Report 2024</span></div>
+        <div class="doc-row"><span class="doc-badge" style="background:#A855F7">EPUB</span><span class="doc-name">Deep Work</span></div>
+        <div class="doc-row"><span class="doc-badge" style="background:#3B82F6">DOCX</span><span class="doc-name">Q4 Strategy Deck</span></div>
+      </div>
+      <div class="card card-4">
+        <div class="chat-lbl">Magnum Opus</div>
+        <div class="chat-line">Three principal risks: APAC supply chain, FX volatility, and EU data shifts.</div>
+        <div class="chat-cite">✓ Cited — p.47–51</div>
+      </div>
+      <div class="card card-5">
+        <div class="badge-lbl">Answer</div>
+        <div class="badge-line">100% grounded in your own documents.</div>
+      </div>
+    </div>
+    <div class="deck-caption">One app. Every document. Real answers.</div>
+  </div>
+
+  <!-- SCENE 4 -->
+  <div class="scene" id="s4">
+    <div class="headline-gradient" style="font-size:60px;">Every file type.<br>One conversation.</div>
+    <div class="pill-row" style="margin-top:44px;">
+      <div class="pill">PDF</div>
+      <div class="pill">EPUB</div>
+      <div class="pill">DOCX</div>
+      <div class="pill">PPTX</div>
+      <div class="pill">XLSX</div>
+    </div>
+  </div>
+
+  <!-- SCENE 5 — closing CTA -->
+  <div class="scene bg-gradient-dark" id="s5">
+    <div class="icon-badge">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M15 4v5h5" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M7.5 13h9M7.5 16.5h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </div>
+    <div class="wordmark">Magnum Opus</div>
+    <div class="sub-white" style="margin-top:10px;">Zero hallucinations. Your docs. Your AI.</div>
+    <div class="cta-badge">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M4 3l14 9-14 9V3z" fill="#111"/></svg>
+      Get it on Google Play
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DURATIONS = [2600, 2600, 3600, 2600, 3000]; // ms per scene
+const TOTAL = DURATIONS.reduce((a,b)=>a+b,0);
+const scenes = ['s1','s2','s3','s4','s5'].map(id=>document.getElementById(id));
+const ticksEl = document.getElementById('ticks');
+DURATIONS.forEach(()=>{ const t=document.createElement('div'); t.className='tick'; const f=document.createElement('div'); f.className='tick-fill'; t.appendChild(f); ticksEl.appendChild(t); });
+const fills = [...ticksEl.querySelectorAll('.tick-fill')];
+
+let current = 0;
+let sceneStart = 0;
+let globalStart = null;
+
+function setScene(idx){
+  scenes.forEach((s,i)=>s.classList.toggle('active', i===idx));
+  fills.forEach((f,i)=>{ f.style.transition='none'; f.style.width = i<idx ? '100%' : '0%'; });
+  current = idx;
+  sceneStart = performance.now();
+}
+
+function loop(now){
+  if(globalStart===null) globalStart = now;
+  const elapsed = now - globalStart;
+  let acc = 0, target = DURATIONS.length - 1;
+  for(let i=0;i<DURATIONS.length;i++){
+    if(elapsed < acc + DURATIONS[i]){ target = i; break; }
+    acc += DURATIONS[i];
+  }
+  if(target !== current){ setScene(target); acc = DURATIONS.slice(0,target).reduce((a,b)=>a+b,0); }
+  const t = elapsed - acc;
+  const f = fills[current];
+  if(f){ f.style.transition='none'; f.style.width = Math.min(100,(t/DURATIONS[current])*100) + '%'; }
+  if(elapsed < TOTAL) requestAnimationFrame(loop);
+  else window.__AD_DONE__ = true;
+}
+
+window.addEventListener('load', ()=>{
+  setScene(0);
+  if (!window.__FREEZE__) requestAnimationFrame(loop);
+});
+window.__AD_TOTAL_MS__ = TOTAL;
+</script>
+</body>
+</html>
