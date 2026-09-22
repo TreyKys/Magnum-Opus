@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Magnum Opus — Ad v3: Highlighting (60s)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;0,900;1,500;1,600&family=Bricolage+Grotesque:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0C0A09; --surface:#16130F; --surface2:#1F1B16; --raised:#272119;
+    --border:#2E2720; --borderStrong:#3D342A;
+    --accent:#C9973F; --accentLight:#E5BE79; --accentDim:#7A5A24; --onAccent:#1A1206;
+    --champagne:#E8D9A0;
+    --ink:#F2EDE3; --ink2:#A8A096; --ink3:#6E665C;
+    --danger:#B5533C; --success:#6B8F5E;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:1080px;height:1920px;overflow:hidden;background:var(--bg);font-family:'Bricolage Grotesque',sans-serif;}
+  .stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:var(--bg);}
+
+  .scene{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    opacity:0; background:var(--bg);
+    padding:0 96px;
+  }
+  .scene.active{opacity:1;}
+
+  .bg-glow{
+    background:
+      radial-gradient(circle at 50% 38%, rgba(201,151,63,0.16), transparent 60%),
+      var(--bg);
+  }
+
+  /* ─── shared anim classes ─────────────────────────────────────────────── */
+  .anim{ opacity:0; transform:translateY(26px); transition:all 0.8s cubic-bezier(0.19,1,0.22,1); }
+  .scene.active .anim{ opacity:1; transform:none; }
+  .anim.d1{ transition-delay:0.12s; }
+  .anim.d2{ transition-delay:0.26s; }
+  .anim.d3{ transition-delay:0.40s; }
+  .anim.d4{ transition-delay:0.54s; }
+
+  .eyebrow{
+    font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:28px;
+    letter-spacing:5px; text-transform:uppercase; color:var(--accent); margin-bottom:30px;
+  }
+  .rule{ width:64px; height:3px; background:var(--accent); margin:32px auto 0; border-radius:2px; }
+
+  .headline{
+    font-family:'Fraunces',serif; font-weight:700; font-size:78px; line-height:1.14;
+    text-align:center; color:var(--ink); letter-spacing:-1px;
+  }
+  .headline.italic{ font-style:italic; font-weight:600; }
+  .headline .hl{ color:var(--accentLight); }
+
+  .sub{
+    margin-top:30px; font-weight:500; font-size:34px; text-align:center;
+    color:var(--ink2); line-height:1.5;
+  }
+
+  .statement{
+    font-family:'Fraunces',serif; font-weight:600; font-size:56px; line-height:1.32;
+    text-align:center; color:var(--ink2);
+  }
+
+  /* ─── phone-ish chat card ─────────────────────────────────────────────── */
+  .card{
+    width:760px; background:var(--surface); border:1px solid var(--border);
+    border-radius:28px; padding:44px 40px; box-shadow:0 40px 90px rgba(0,0,0,0.5);
+  }
+  .card-head{ display:flex; align-items:center; gap:16px; margin-bottom:32px; }
+  .card-dot{ width:14px; height:14px; border-radius:50%; background:var(--accent); }
+  .card-title{ font-weight:700; font-size:26px; color:var(--ink2); letter-spacing:0.5px; }
+  .doc-line{ height:20px; border-radius:5px; background:var(--surface2); margin-bottom:18px; }
+  .doc-line.w95{width:95%;} .doc-line.w88{width:88%;} .doc-line.w70{width:70%;}
+  .doc-line.hl{
+    background:linear-gradient(90deg, var(--accentDim), var(--accent) 60%, var(--accentDim));
+    background-size:220% 100%;
+  }
+  .msg-u{
+    align-self:flex-end; background:var(--raised); border:1px solid var(--borderStrong);
+    border-radius:20px 20px 4px 20px; padding:20px 26px; max-width:82%; margin-left:auto; margin-bottom:26px;
+  }
+  .msg-u span{ font-size:28px; color:var(--ink); font-weight:600; }
+  .msg-a{
+    background:var(--surface); border-left:3px solid var(--accent);
+    border-radius:4px 20px 20px 20px; padding:22px 26px; max-width:92%;
+  }
+  .msg-a .lbl{ font-size:18px; font-weight:800; letter-spacing:2px; color:var(--accent); margin-bottom:10px; text-transform:uppercase; }
+  .msg-a span{ font-size:28px; color:var(--ink); line-height:1.55; font-weight:500; }
+  .cite-chip{
+    display:inline-block; margin-top:16px; background:var(--accentWash,rgba(201,151,63,0.14));
+    border:1px solid var(--accentDim); color:var(--accentLight); font-weight:700; font-size:20px;
+    letter-spacing:0.5px; padding:8px 16px; border-radius:100px;
+  }
+
+  .step-tag{
+    font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:24px;
+    letter-spacing:3px; color:var(--accent); margin-bottom:20px; text-transform:uppercase;
+  }
+  .step-head{
+    font-family:'Fraunces',serif; font-weight:700; font-size:60px; color:var(--ink);
+    text-align:center; margin-bottom:52px; letter-spacing:-0.5px;
+  }
+
+  /* ─── reveal ───────────────────────────────────────────────────────────── */
+  .wordmark{
+    font-family:'Fraunces',serif; font-weight:600; font-style:italic; font-size:96px;
+    color:var(--ink); letter-spacing:-1px; text-align:center;
+  }
+  .wordmark .op{ color:var(--accentLight); }
+
+  /* ─── CTA ──────────────────────────────────────────────────────────────── */
+  .icon-wrap{
+    width:172px; height:172px; border-radius:44px; overflow:hidden;
+    box-shadow:0 30px 70px rgba(201,151,63,0.25); margin-bottom:44px;
+    border:1px solid var(--borderStrong);
+  }
+  .icon-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .cta-name{ font-family:'Fraunces',serif; font-weight:700; font-size:58px; color:var(--ink); text-align:center; }
+  .cta-tag{ margin-top:18px; font-weight:500; font-size:32px; color:var(--ink2); text-align:center; }
+  .cta-badge{
+    margin-top:52px; display:flex; align-items:center; gap:14px;
+    background:var(--accent); color:var(--onAccent); font-weight:800; font-size:32px;
+    padding:22px 44px; border-radius:100px; letter-spacing:0.2px;
+  }
+  .cta-note{ margin-top:28px; font-weight:500; font-size:26px; color:var(--ink3); text-align:center; }
+
+  /* ─── progress ticks ──────────────────────────────────────────────────── */
+  .ticks{ position:absolute; top:56px; left:56px; right:56px; display:flex; gap:8px; z-index:10; }
+  .tick{ flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,0.14); overflow:hidden; }
+  .tick-fill{ height:100%; width:0%; background:var(--accentLight); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="ticks" id="ticks"></div>
+
+  <!-- S1 -->
+  <div class="scene" id="s1">
+    <div class="eyebrow anim">You know this feeling</div>
+    <div class="headline anim d1">You highlighted<br>the whole chapter.</div>
+  </div>
+
+  <!-- S2 -->
+  <div class="scene" id="s2">
+    <div class="headline anim">Then read it<br><span class="hl">again.</span></div>
+  </div>
+
+  <!-- S3 -->
+  <div class="scene" id="s3">
+    <div class="headline anim">And still went blank<br>on the exam.</div>
+    <div class="rule anim d1"></div>
+  </div>
+
+  <!-- S4 — tension -->
+  <div class="scene bg-glow" id="s4">
+    <div class="statement anim" style="color:var(--ink);">Highlighting isn't studying.</div>
+    <div class="statement anim d2" style="font-style:italic; margin-top:18px;">Understanding is.</div>
+  </div>
+
+  <!-- S5 — reveal -->
+  <div class="scene bg-glow" id="s5">
+    <div class="eyebrow anim">read differently</div>
+    <div class="wordmark anim d1">Magnum <span class="op">Opus</span></div>
+  </div>
+
+  <!-- S6 — step 1 -->
+  <div class="scene" id="s6">
+    <div class="step-tag anim">Step 1</div>
+    <div class="step-head anim d1">Select what<br>confuses you.</div>
+    <div class="card anim d2">
+      <div class="card-head"><div class="card-dot"></div><div class="card-title">Chapter 4 — Thermodynamics.pdf</div></div>
+      <div class="doc-line w95"></div>
+      <div class="doc-line w88"></div>
+      <div class="doc-line w70 hl" id="hlLine"></div>
+      <div class="doc-line w95" style="margin-top:2px;"></div>
+      <div class="doc-line w88"></div>
+    </div>
+  </div>
+
+  <!-- S7 — step 2 -->
+  <div class="scene" id="s7">
+    <div class="step-tag anim">Step 2</div>
+    <div class="step-head anim d1">Ask it, like<br>you'd ask a person.</div>
+    <div class="card anim d2" style="display:flex; flex-direction:column;">
+      <div class="msg-u"><span>Why does entropy always increase here?</span></div>
+    </div>
+  </div>
+
+  <!-- S8 — step 3 -->
+  <div class="scene" id="s8">
+    <div class="step-tag anim">Step 3</div>
+    <div class="step-head anim d1">Get the answer —<br>cited to the page.</div>
+    <div class="card anim d2" style="display:flex; flex-direction:column;">
+      <div class="msg-u" style="margin-bottom:26px;"><span>Why does entropy always increase here?</span></div>
+      <div class="msg-a">
+        <div class="lbl">Magnum Opus</div>
+        <span>Because the system moves toward its most probable state — the one with the most possible arrangements. That's what page 42 means by "statistical inevitability."</span>
+        <div class="cite-chip">Cited — p. 42</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S9 — payoff -->
+  <div class="scene" id="s9">
+    <div class="headline anim">Understand it once.<br><span class="hl">Not five times.</span></div>
+  </div>
+
+  <!-- S10 — CTA -->
+  <div class="scene" id="s10">
+    <div class="icon-wrap anim"><img src="../../assets/icons/app_icon.png" alt="Magnum Opus"></div>
+    <div class="cta-name anim d1">Magnum Opus</div>
+    <div class="cta-tag anim d1">Read it once. Actually know it.</div>
+    <div class="cta-badge anim d2">Now on Google Play</div>
+    <div class="cta-note anim d3">Free to start · Pro unlocks unlimited</div>
+  </div>
+
+</div>
+
+<script>
+const DURATIONS = [4500, 4000, 5000, 5500, 5000, 4500, 4500, 5000, 5000, 12000]; // 60s
+const TOTAL = DURATIONS.reduce((a,b)=>a+b,0);
+const ids = ['s1','s2','s3','s4','s5','s6','s7','s8','s9','s10'];
+const scenes = ids.map(id=>document.getElementById(id));
+const ticksEl = document.getElementById('ticks');
+DURATIONS.forEach(()=>{ const t=document.createElement('div'); t.className='tick'; const f=document.createElement('div'); f.className='tick-fill'; t.appendChild(f); ticksEl.appendChild(t); });
+const fills = [...ticksEl.querySelectorAll('.tick-fill')];
+
+let current = 0;
+let globalStart = null;
+
+function setScene(idx){
+  scenes.forEach((s,i)=>s.classList.toggle('active', i===idx));
+  fills.forEach((f,i)=>{ f.style.transition='none'; f.style.width = i<idx ? '100%' : '0%'; });
+  current = idx;
+  if(idx===5){
+    const hl = document.getElementById('hlLine');
+    if(hl){ hl.style.animation='none'; void hl.offsetWidth; hl.style.animation='sweep 1.4s ease-in-out 0.3s'; }
+  }
+}
+
+function loop(now){
+  if(globalStart===null) globalStart = now;
+  const elapsed = now - globalStart;
+  let acc = 0, target = DURATIONS.length - 1;
+  for(let i=0;i<DURATIONS.length;i++){
+    if(elapsed < acc + DURATIONS[i]){ target = i; break; }
+    acc += DURATIONS[i];
+  }
+  if(target !== current){ setScene(target); acc = DURATIONS.slice(0,target).reduce((a,b)=>a+b,0); }
+  const t = elapsed - acc;
+  const f = fills[current];
+  if(f){ f.style.transition='none'; f.style.width = Math.min(100,(t/DURATIONS[current])*100) + '%'; }
+  if(elapsed < TOTAL) requestAnimationFrame(loop);
+  else window.__AD_DONE__ = true;
+}
+
+window.addEventListener('load', ()=>{
+  setScene(0);
+  requestAnimationFrame(loop);
+});
+window.__AD_TOTAL_MS__ = TOTAL;
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = '@keyframes sweep{0%{background-position:200% 0;}100%{background-position:0% 0;}}';
+document.head.appendChild(styleSheet);
+</script>
+</body>
+</html>
