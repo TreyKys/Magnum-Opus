@@ -2,7 +2,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:markdown_widget/markdown_widget.dart';
 import 'package:magnum_opus/core/ads/ad_config.dart';
 import 'package:magnum_opus/core/ads/rewarded_interstitial_controller.dart';
 import 'package:magnum_opus/core/theme/app_theme.dart';
@@ -172,7 +171,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
               widget.document.title,
               style: const TextStyle(
                 color: AppTheme.textPrimary,
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
               overflow: TextOverflow.ellipsis,
@@ -181,7 +180,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
               '${widget.document.totalPages} sections · RAG active',
               style: const TextStyle(
                 color: AppTheme.textMuted,
-                fontSize: 11,
+                fontSize: 12,
               ),
             ),
           ],
@@ -295,7 +294,7 @@ class _MessageBubble extends ConsumerWidget {
                   ),
                   child: Text(
                     message.text,
-                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                    style: MarkdownTheme.body,
                   ),
                 ),
               ),
@@ -308,7 +307,7 @@ class _MessageBubble extends ConsumerWidget {
                 initials,
                 style: const TextStyle(
                     color: AppTheme.onAccent,
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700),
               ),
             ),
@@ -332,15 +331,12 @@ class _MessageBubble extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
               child: Text('MAGNUM OPUS · $depthLabel DEPTH',
-                  style: AppTheme.eyebrow(color: AppTheme.accent)),
+                  style: AppTheme.eyebrow(
+                      color: AppTheme.accent, fontSize: 11)),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-              child: MarkdownWidget(
-                data: parsed.body,
-                shrinkWrap: true,
-                config: MarkdownTheme.response,
-              ),
+              child: ResponseMarkdown(parsed.body),
             ),
             for (final src in parsed.sources) _SourceChip(text: src),
             const SizedBox(height: 8),
@@ -397,7 +393,7 @@ class _SourceChip extends StatelessWidget {
             'SRC',
             style: TextStyle(
               color: AppTheme.accent,
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
             ),
@@ -407,7 +403,9 @@ class _SourceChip extends StatelessWidget {
             child: Text(
               text,
               style: const TextStyle(
-                  color: AppTheme.textMuted, fontSize: 12),
+                  color: AppTheme.textSecondary,
+                  fontSize: MarkdownTheme.metaSize,
+                  height: 1.4),
             ),
           ),
         ],
@@ -439,7 +437,7 @@ class _InputBar extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+              style: MarkdownTheme.body,
               maxLines: 4,
               minLines: 1,
               decoration: InputDecoration(
@@ -455,7 +453,7 @@ class _InputBar extends StatelessWidget {
                 ),
                 suffixText: energy < 0 ? '∞ Pro' : '$energy left',
                 suffixStyle: const TextStyle(
-                    color: AppTheme.textMuted, fontSize: 11),
+                    color: AppTheme.textMuted, fontSize: MarkdownTheme.metaSize),
               ),
               onSubmitted: (_) => onSend(),
             ),
@@ -500,7 +498,7 @@ class _NoEnergyBanner extends StatelessWidget {
             child: Text(
               'No queries left today',
               style:
-                  TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                  TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
           ),
           if (loadingAd)
@@ -526,7 +524,10 @@ class _NoEnergyBanner extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const UpgradeScreen()),
             ),
             child: const Text('Upgrade',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -590,7 +591,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                   'Thinking',
                   style: TextStyle(
                       color: AppTheme.accent,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(width: 8),
@@ -646,7 +647,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               docTitle,
               style: const TextStyle(
-                  color: AppTheme.textMuted, fontSize: 13),
+                  color: AppTheme.textMuted, fontSize: 14),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

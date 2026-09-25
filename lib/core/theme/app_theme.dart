@@ -98,9 +98,9 @@ class AppTheme {
 
   /// Wide-tracked caps used for section headers ("RECENT DOCUMENTS").
   /// The heavy tracking is a signature of the system — keep it consistent.
-  static TextStyle eyebrow({Color color = textMuted}) =>
+  static TextStyle eyebrow({Color color = textMuted, double fontSize = 10}) =>
       GoogleFonts.bricolageGrotesque(
-        fontSize: 10,
+        fontSize: fontSize,
         fontWeight: FontWeight.w700,
         color: color,
         letterSpacing: 1.8,
